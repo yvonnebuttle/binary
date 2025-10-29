@@ -192,7 +192,9 @@ async function detectCategorySmart(text, userLat, userLng) {
     'Dates': ['date','dating','went out','met up'],
     'People': ['person','friend','met','someone','colleague'],
     'Sports': ['tennis','game','played','match','workout','exercise','gym'],
-    'Entertainment': ['movie','show','series','book','music','concert','watched','read'],
+    'Entertainment': ['show','series','music','concert','watched','read'],
+      'Books': ['book']
+      'Movies'['movie', 'film']
   };
   for (const [cat, keywords] of Object.entries(categories)) {
     if (keywords.some(k => lowerText.includes(k))) return cat;
