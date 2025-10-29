@@ -100,7 +100,7 @@ async function detectCategory(text, userLat, userLng) {
   } catch(err){ console.warn('Books detection failed', err); }
 
   // --- TMDB Movies API ---
-  const tmdbKey = 'YOUR_TMDB_KEY_HERE'; // <-- insert your TMDB key
+  const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8'; // <-- insert your TMDB key
   try {
     const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
     const data = await res.json();
@@ -112,15 +112,14 @@ async function detectCategory(text, userLat, userLng) {
 
 // === Main App ===
 function BinaryApp() {
-  const [items, setItems] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(true);
-  const [editingComment, setEditingComment] = useState(null);
-  const [commentText, setCommentText] = useState('');
+  const [items, setItems] = React.useState([]);
+  const [inputText, setInputText] = React.useState('');
+  const [selectedCategory, setSelectedCategory] = React.useState('All');
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [editingComment, setEditingComment] = React.useState(null);
+  const [commentText, setCommentText] = React.useState('');
 
-  // --- Load items & get location ---
-  useEffect(() => {
+  React.useEffect(() => {
     const stored = localStorage.getItem('binaryItems');
     if (stored) setItems(JSON.parse(stored));
     setIsLoading(false);
@@ -136,7 +135,6 @@ function BinaryApp() {
     localStorage.setItem('binaryItems', JSON.stringify(newItems));
   };
 
-  // --- Add item ---
   const addItem = async (rating) => {
     if (!inputText.trim()) return;
     const category = await detectCategory(inputText, window.userLat, window.userLng);
@@ -146,21 +144,17 @@ function BinaryApp() {
       rating,
       category,
       timestamp: Date.now(),
-      date: new Date().toLocaleDateString()
+      date: new Date().toLocaleDateString(),
     };
     saveItems([newItem, ...items]);
     setInputText('');
   };
 
-  // --- Update category manually ---
   const updateCategory = (id, newCat) => {
     saveItems(items.map(item => item.id === id ? { ...item, category: newCat } : item));
   };
 
-  // --- Delete ---
   const deleteItem = (id) => saveItems(items.filter(item => item.id !== id));
-
-  // --- Comments ---
   const startEditingComment = (item) => { setEditingComment(item.id); setCommentText(item.comment || ''); };
   const saveComment = (id) => { 
     saveItems(items.map(i => i.id === id ? { ...i, comment: commentText.trim() } : i));
@@ -168,10 +162,8 @@ function BinaryApp() {
   };
   const cancelEditingComment = () => { setEditingComment(null); setCommentText(''); };
 
-  // --- Filtering ---
   const categories = ['All', ...ALL_CATEGORIES];
   const filteredItems = selectedCategory === 'All' ? items : items.filter(i => i.category === selectedCategory);
-
   const getRatingEmoji = (rating) => rating === 'like' ? '👍' : '👎';
   const getRatingColor = (rating) => rating === 'like' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300';
 
@@ -180,6 +172,7 @@ function BinaryApp() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
       <div className="max-w-2xl mx-auto px-4 py-6">
+
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Binary</h1>
@@ -237,113 +230,95 @@ function BinaryApp() {
           </div>
         )}
 
-        {/* Items list */}
+        {/* Items List */}
         <div className="space-y-3">
           {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
               <div className="flex justify-center mb-4"><List /></div>
               <p className="text-gray-500">{items.length === 0 ? "No ratings yet." : "No items in this category yet."}</p>
             </div>
-          ) : filteredItems.map(item => (
-            <div key={item.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
-                      {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'}
-                    </span>
+          ) : (
+            filteredItems.map(item => (
+              <div key={item.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
+                        {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'}
+                      </span>
 
-                    {/* Dynamic manual category */}
-                    <select
-                      value={item.category}
-                      onChange={(e) => updateCategory(item.id, e.target.value)}
-                      className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700"
-                    >
-                      {ALL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                  </div>
-
-                  <p className="text-gray-800 font-medium mb-1">{item.text}</p>
-                  <p className="text-sm text-gray-500">{item.date}</p>
-
-                  {/* Comments */}
-                  {editingComment === item.id ? (
-                    <div className="mt-3 space-y-2">
-                      <textarea
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Add your thoughts..."
-                        className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none"
-                        rows="3"
-                        autoFocus
-                                />
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => saveComment(item.id)}
-                                    className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={cancelEditingComment}
-                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                {item.comment && (
-                                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                                    <p className="text-sm text-gray-700 italic">{item.comment}</p>
-                                  </div>
-                                )}
-                                <button
-                                  onClick={() => startEditingComment(item)}
-                                  className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"
-                                >
-                                  <MessageSquare />
-                                  {item.comment ? 'Edit comment' : 'Add comment'}
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => deleteItem(item.id)}
-                            className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {items.length > 0 && (
-                  <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
-                    <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-4 bg-green-50 rounded-xl">
-                        <div className="text-3xl font-bold text-green-600">
-                          {items.filter(i => i.rating === 'like').length}
-                        </div>
-                        <div className="text-sm text-gray-600">Liked</div>
-                      </div>
-                      <div className="text-center p-4 bg-red-50 rounded-xl">
-                        <div className="text-3xl font-bold text-red-600">
-                          {items.filter(i => i.rating === 'dislike').length}
-                        </div>
-                        <div className="text-sm text-gray-600">Disliked</div>
-                      </div>
+                      <select
+                        value={item.category}
+                        onChange={(e) => updateCategory(item.id, e.target.value)}
+                        className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700"
+                      >
+                        {ALL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      </select>
                     </div>
+
+                    <p className="text-gray-800 font-medium mb-1">{item.text}</p>
+                    <p className="text-sm text-gray-500">{item.date}</p>
+
+                    {editingComment === item.id ? (
+                      <div className="mt-3 space-y-2">
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          placeholder="Add your thoughts..."
+                          className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none"
+                          rows="3"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => saveComment(item.id)} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors">Save</button>
+                          <button onClick={cancelEditingComment} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {item.comment && (
+                          <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-sm text-gray-700 italic">{item.comment}</p>
+                          </div>
+                        )}
+                        <button onClick={() => startEditingComment(item)} className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium">
+                          <MessageSquare />
+                          {item.comment ? 'Edit comment' : 'Add comment'}
+                        </button>
+                      </>
+                    )}
                   </div>
-                )}
+
+                  <button onClick={() => deleteItem(item.id)} className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Stats */}
+        {items.length > 0 && (
+          <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
+            <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 bg-green-50 rounded-xl">
+                <div className="text-3xl font-bold text-green-600">{items.filter(i => i.rating === 'like').length}</div>
+                <div className="text-sm text-gray-600">Liked</div>
+              </div>
+              <div className="text-center p-4 bg-red-50 rounded-xl">
+                <div className="text-3xl font-bold text-red-600">{items.filter(i => i.rating === 'dislike').length}</div>
+                <div className="text-sm text-gray-600">Disliked</div>
               </div>
             </div>
-          );
-        }
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
 
         ReactDOM.render(<BinaryApp />, document.getElementById('root'));
     </script>
