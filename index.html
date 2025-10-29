@@ -203,26 +203,6 @@ async function detectCategorySmart(text, userLat, userLng) {
   return 'Other';
 }
 
-
-    // 4️⃣ Keyword fallback
-    const lower = text.toLowerCase();
-    const categories = {
-      'Food': ['restaurant','meal','dinner','lunch','breakfast','food','dish','ate','eating'],
-      'Cheese': ['cheese','brie','cheddar','gouda','mozzarella','parmesan'],
-      'Coffee': ['coffee','cafe','espresso','latte','cappuccino','americano'],
-      'Places': ['visited','trip','travel','vacation','holiday','beach','town','city','park','museum','bar','club','venue'],
-      'Dates': ['date','dating','went out','met up'],
-      'People': ['person','friend','met','someone','colleague'],
-      'Sports': ['tennis','game','played','match','workout','exercise','gym'],
-      'Entertainment': ['movie','show','series','book','music','concert','watched','read'],
-    };
-    for (const [cat, keywords] of Object.entries(categories)) {
-      if (keywords.some(k => lower.includes(k))) return cat;
-    }
-
-    return 'Other';
-  }
-
   // --- Add item ---
   const addItem = async (rating) => {
     if (!inputText.trim()) return;
