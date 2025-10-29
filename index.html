@@ -59,6 +59,18 @@ const CATEGORY_KEYWORDS = {
   Places: ["museum","park","beach","city","town","venue","holiday","trip","vacation","tourist_attraction"],
   Things: ["shoes","bike","sneakers","sponges","jacket","laptop","bag","phone","watch","bike","sneakers","runners"],
 };
+// Helper: wait until Google Maps API is loaded
+function waitForGoogleMaps() {
+  return new Promise(resolve => {
+    if (window.google && window.google.maps) return resolve();
+    const interval = setInterval(() => {
+      if (window.google && window.google.maps) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 100);
+  });
+}
 
 // Helper: compute distance in km between two lat/lng points
 function distanceKm(lat1, lon1, lat2, lon2) {
@@ -70,17 +82,18 @@ function distanceKm(lat1, lon1, lat2, lon2) {
     Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-
 // Main detection function
 async function detectCategory(inputText, userLat, userLng) {
   const text = inputText.trim();
+  if (!text) return { category: 'Other', confidence: '0.00', confidenceMap: {} };
+
   const lower = text.toLowerCase();
   const isCapitalised = /^[A-Z]/.test(text);
 
   // Check cache first
   if (categoryCache[text]) return categoryCache[text];
 
-  // Initialize confidence for all categories
+  // Initialize confidence map
   const confidence = {};
   ALL_CATEGORIES.forEach(cat => confidence[cat] = 0);
 
@@ -93,7 +106,7 @@ async function detectCategory(inputText, userLat, userLng) {
     if (bookData.items && bookData.items.length > 0) {
       const exact = bookData.items.find(b => b.volumeInfo.title.toLowerCase() === lower);
       confidence.Books = exact ? 0.9 : 0.6;
-      if (isCapitalised) confidence.Books += 0.2; // capitalization boost ONLY for Books
+      if (isCapitalised) confidence.Books += 0.2;
     }
   } catch(err){ console.warn("Books API failed:", err); }
 
@@ -102,26 +115,28 @@ async function detectCategory(inputText, userLat, userLng) {
   // --------------------
   try {
     const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8';
-    const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
-    const movieData = await movieRes.json();
-    if (movieData.results && movieData.results.length > 0) {
-      const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
-      confidence.Movies = exact ? 0.9 : 0.6;
-      if (isCapitalised) confidence.Movies += 0.2; // capitalization boost ONLY for Movies
+    if (tmdbKey !== '559458ec6b7148bf5d8a39f7224a2fb8') {
+      const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
+      const movieData = await movieRes.json();
+      if (movieData.results && movieData.results.length > 0) {
+        const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
+        confidence.Movies = exact ? 0.9 : 0.6;
+        if (isCapitalised) confidence.Movies += 0.2;
+      }
     }
   } catch(err){ console.warn("Movies API failed:", err); }
 
   // --------------------
   // 3️⃣ Google Places API
   // --------------------
-  if (window.google && window.google.maps) {
-    try {
+  try {
+    await waitForGoogleMaps();
+    if (window.google && window.google.maps) {
       await new Promise(resolve => {
         const service = new google.maps.places.AutocompleteService();
         service.getPlacePredictions({ input: text, types: ['establishment'] },
           (predictions, status) => {
-            if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length)
-              return resolve(null);
+            if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length) return resolve();
 
             const first = predictions[0];
             const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
@@ -129,35 +144,25 @@ async function detectCategory(inputText, userLat, userLng) {
               (place, detailsStatus) => {
                 if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
                   let nearbyBoost = 0;
-                  let distKm = 999;
-
                   if (userLat && userLng && place.geometry?.location) {
-                    distKm = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
-                    if (distKm < 5) nearbyBoost = 0.2;
+                    const dist = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
+                    if (dist < 5) nearbyBoost = 0.2;
                   }
 
-                  // Map Google types to categories
-                  const typeMap = {
-                    cafe: 'Coffee',
-                    bar: 'Beverages',
-                    pub: 'Beverages',
-                    restaurant: 'Food',
-                  };
+                  const typeMap = { cafe:'Coffee', bar:'Beverages', pub:'Beverages', restaurant:'Food' };
                   let baseCat = null;
-                  for (let t of place.types) {
-                    if (typeMap[t]) { baseCat = typeMap[t]; break; }
-                  }
+                  for (let t of place.types) if (typeMap[t]) { baseCat = typeMap[t]; break; }
                   if (!baseCat && place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','establishment'].includes(t)))
                     baseCat = 'Places';
 
                   if (baseCat) confidence[baseCat] = Math.max(confidence[baseCat], 0.6 + nearbyBoost);
                 }
-                resolve(null);
+                resolve();
               });
           });
       });
-    } catch(err){ console.warn("Places detection failed:", err); }
-  }
+    }
+  } catch(err){ console.warn("Places detection failed:", err); }
 
   // --------------------
   // 4️⃣ Keyword fallback
@@ -174,12 +179,14 @@ async function detectCategory(inputText, userLat, userLng) {
   const sorted = Object.entries(confidence).sort((a,b) => b[1]-a[1]);
   let [bestCat, bestScore] = sorted[0];
   if (bestScore < 0.4) bestCat = 'Other';
+
   const result = { category: bestCat, confidence: bestScore.toFixed(2), confidenceMap: confidence };
 
-  // Cache result
+  // Save to cache & localStorage
   categoryCache[text] = result;
+  saveCache();
+
   return result;
-}
 
 // === Main App ===
 function BinaryApp() {
