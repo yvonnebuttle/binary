@@ -24,186 +24,162 @@ const ThumbsDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" heig
 const MessageSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
 const Trash2 = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
 
-// === Categories & keywords ===
-const ALL_CATEGORIES = ['Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies','Cheese','Dates','People','Sports','Entertainment','Things','Other'];
+// === Categories ===
+const ALL_CATEGORIES = [
+  'Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies',
+  'Cheese', 'Dates', 'People', 'Sports', 'Entertainment', 'Things', 'Other'
+];
 
+// Keywords for instant categorization
 const CATEGORY_KEYWORDS = {
-  Cheese: ["cheese","cheddar","brie","gouda","mozzarella","parmesan","feta","camembert","gruyere","manchego","pecorino","ricotta","stilton","roquefort","gorgonzola","emmental","havarti","provolone"],
-  Sports: ["football","soccer","basketball","tennis","cricket","rugby","baseball","hockey","golf","swimming","match","championship","tournament","surfing","skiing","snowboarding","skateboarding","climbing","hiking","running","cycling","yoga","pilates","boxing","wrestling","martial arts","karate","judo","gymnastics","athletics","track","field"],
-  Dates: ["date","dating","romantic","anniversary","valentine","proposal","engagement","wedding","relationship","boyfriend","girlfriend","partner","spouse"],
-  Entertainment: ["concert","festival","show","performance","theater","theatre","comedy","stand-up","magic","circus","exhibition","gig","club","nightclub","disco","rave","party","event"]
+  Cheese: ["cheese","cheddar","brie","gouda","mozzarella","parmesan","feta"],
+  Sports: ["football","soccer","basketball","tennis","cricket","rugby","baseball"],
+  Dates: ["date","dating","anniversary","valentine","proposal","engagement","wedding","relationship"],
+  Entertainment: ["concert","festival","show","comedy","stand-up","magic","circus","exhibition","party","event"]
 };
 
-// --- cache ---
+// Cache
 let categoryCache = {};
-try { categoryCache = JSON.parse(localStorage.getItem("categoryCache")) || {}; } catch(e){}
+try { categoryCache = JSON.parse(localStorage.getItem("categoryCache")||"{}"); } catch{}
 
-// === detect category (hybrid simplified) ===
-function detectCategory(text) {
-  const input = text.trim().toLowerCase();
-  if(!input) return 'Other';
+function saveCache(){ localStorage.setItem("categoryCache", JSON.stringify(categoryCache)); }
 
-  if(categoryCache[input]) return categoryCache[input];
+// --- Hybrid classifier ---
+async function detectCategory(text) {
+  text = text.trim();
+  if(!text) return 'Other';
+  const lower = text.toLowerCase();
 
-  // Keyword match
-  for(const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if(keywords.some(k => input.split(/\s+/).includes(k))) {
-      categoryCache[input] = cat;
-      localStorage.setItem("categoryCache", JSON.stringify(categoryCache));
-      return cat;
+  if(categoryCache[text]) return categoryCache[text];
+
+  // 1️⃣ Keyword match
+  for(const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)){
+    if(keywords.some(k=>lower.includes(k))){
+      categoryCache[text]=cat; saveCache(); return cat;
     }
   }
 
-  // Fallback: simple heuristic for best guess
-  const matches = ALL_CATEGORIES.filter(c => input.includes(c.toLowerCase()));
-  const category = matches[0] || 'Other';
-  categoryCache[input] = category;
-  localStorage.setItem("categoryCache", JSON.stringify(categoryCache));
-  return category;
+  // 2️⃣ Tiny LLM fallback
+  try {
+    if(window.gpt4allMini){
+      const prompt = `Choose the best matching category for this text from: ${ALL_CATEGORIES.join(", ")}. Text: "${text}"`;
+      const out = await window.gpt4allMini.generate(prompt);
+      const match = ALL_CATEGORIES.find(c=>out.toLowerCase().includes(c.toLowerCase())) || 'Other';
+      categoryCache[text]=match; saveCache(); return match;
+    } else {
+      return 'Other';
+    }
+  } catch(e){ console.warn(e); return 'Other'; }
 }
 
-// === React App ===
+// === App ===
 function BinaryApp() {
-  const [items, setItems] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [editingComment, setEditingComment] = useState(null);
-  const [commentText, setCommentText] = useState('');
+  const [items,setItems] = useState([]);
+  const [inputText,setInputText] = useState('');
+  const [selectedCategory,setSelectedCategory]=useState('All');
+  const [editingComment,setEditingComment]=useState(null);
+  const [commentText,setCommentText]=useState('');
+  const [isProcessing,setIsProcessing]=useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('binaryItems');
+  useEffect(()=>{ 
+    const stored=localStorage.getItem('binaryItems'); 
     if(stored) setItems(JSON.parse(stored));
-  }, []);
+  },[]);
 
-  const saveItems = (newItems) => { 
-    setItems(newItems); 
-    localStorage.setItem('binaryItems', JSON.stringify(newItems));
-  };
+  const saveItems=(newItems)=>{
+    setItems(newItems);
+    localStorage.setItem('binaryItems',JSON.stringify(newItems));
+  }
 
-  const addItem = (rating) => {
-    if(!inputText.trim()) return;
-    const category = detectCategory(inputText);
-    const newItem = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      rating,
-      category,
-      timestamp: Date.now(),
-      date: new Date().toLocaleDateString(),
-    };
-    saveItems([newItem, ...items]);
-    setInputText('');
-  };
+  const addItem=async (rating)=>{
+    if(!inputText.trim()||isProcessing) return;
+    setIsProcessing(true);
+    try{
+      const category=await detectCategory(inputText);
+      const newItem={id:Date.now().toString(),text:inputText.trim(),rating,category,date:new Date().toLocaleDateString()};
+      saveItems([newItem,...items]);
+      setInputText('');
+    }catch(err){ console.error(err); } 
+    finally{ setIsProcessing(false); }
+  }
 
-  const updateCategory = (id, cat) => saveItems(items.map(i => i.id===id? {...i, category: cat}: i));
-  const deleteItem = (id) => saveItems(items.filter(i => i.id !== id));
-  const startEditingComment = (item) => { setEditingComment(item.id); setCommentText(item.comment||''); };
-  const saveComment = (id) => { saveItems(items.map(i=>i.id===id?{...i,comment:commentText.trim()}:i)); setEditingComment(null); setCommentText(''); };
-  const cancelEditingComment = () => { setEditingComment(null); setCommentText(''); };
+  const updateCategory=(id,newCat)=>saveItems(items.map(i=>i.id===id?{...i,category:newCat}:i));
+  const deleteItem=id=>saveItems(items.filter(i=>i.id!==id));
+  const startEditingComment=item=>{ setEditingComment(item.id); setCommentText(item.comment||''); };
+  const saveComment=id=>{ saveItems(items.map(i=>i.id===id?{...i,comment:commentText.trim()}:i)); setEditingComment(null); setCommentText(''); };
+  const cancelEditingComment=()=>{ setEditingComment(null); setCommentText(''); };
 
-  const filteredItems = selectedCategory==='All'? items : items.filter(i=>i.category===selectedCategory);
-  const getRatingEmoji = r => r==='like'? '👍':'👎';
-  const getRatingColor = r => r==='like'? 'bg-green-100 text-green-800 border-green-300':'bg-red-100 text-red-800 border-red-300';
+  const categories=['All',...ALL_CATEGORIES];
+  const filteredItems=selectedCategory==='All'?items:items.filter(i=>i.category===selectedCategory);
+  const getRatingEmoji=r=>r==='like'?'👍':'👎';
+  const getRatingColor=r=>r==='like'?'bg-green-100 text-green-800 border-green-300':'bg-red-100 text-red-800 border-red-300';
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Binary</h1>
-          <p className="text-gray-600">Yes/no, that's all</p>
-        </div>
-
-        {/* Input */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <input 
-              value={inputText} 
-              onChange={e=>setInputText(e.target.value)}
-              placeholder="What did you experience?"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none"
-              onKeyDown={e=>e.key==='Enter' && inputText.trim() && addItem('like')}
-            />
-          </div>
-          <div className="flex gap-3">
-            <button onClick={()=>addItem('like')} className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors">
-              <ThumbsUp /> Like
-            </button>
-            <button onClick={()=>addItem('dislike')} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors">
-              <ThumbsDown /> Dislike
-            </button>
-          </div>
-        </div>
-
-        {/* Filter */}
-        {items.length>0 && (
-          <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-            <div className="flex flex-wrap gap-2">
-              {['All', ...ALL_CATEGORIES].map(cat=>(
-                <button key={cat} onClick={()=>setSelectedCategory(cat)} className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory===cat?'bg-purple-500 text-white':'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{cat}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Items */}
-        <div className="space-y-3">
-          {filteredItems.length===0 ? <div className="bg-white rounded-2xl shadow-lg p-12 text-center"><p className="text-gray-500">{items.length===0?'No ratings yet.':'No items in this category yet.'}</p></div> :
-          filteredItems.map(item=>(
-            <div key={item.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>{getRatingEmoji(item.rating)} {item.rating==='like'?'Liked':'Disliked'}</span>
-                    <select value={item.category} onChange={e=>updateCategory(item.id,e.target.value)} className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700">
-                      {ALL_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <p className="text-gray-800 font-medium mb-1">{item.text}</p>
-                  <p className="text-sm text-gray-500">{item.date}</p>
-
-                  {editingComment===item.id?(
-                    <div className="mt-3 space-y-2">
-                      <textarea value={commentText} onChange={e=>setCommentText(e.target.value)} placeholder="Add your thoughts..." className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none" rows="3" autoFocus />
-                      <div className="flex gap-2">
-                        <button onClick={()=>saveComment(item.id)} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors">Save</button>
-                        <button onClick={cancelEditingComment} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">Cancel</button>
-                      </div>
-                    </div>
-                  ):(
-                    <>
-                      {item.comment && <div className="mt-2 p-3 bg-gray-50 rounded-lg"><p className="text-sm text-gray-700 italic">{item.comment}</p></div>}
-                      <button onClick={()=>startEditingComment(item)} className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"><MessageSquare />{item.comment?'Edit comment':'Add comment'}</button>
-                    </>
-                  )}
-                </div>
-                <button onClick={()=>deleteItem(item.id)} className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Stats */}
-        {items.length>0 && (
-          <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
-            <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-green-50 rounded-xl">
-                <div className="text-3xl font-bold text-green-600">{items.filter(i=>i.rating==='like').length}</div>
-                <div className="text-sm text-gray-600">Liked</div>
-              </div>
-              <div className="text-center p-4 bg-red-50 rounded-xl">
-                <div className="text-3xl font-bold text-red-600">{items.filter(i=>i.rating==='dislike').length}</div>
-                <div className="text-sm text-gray-600">Disliked</div>
-              </div>
-            </div>
-          </div>
-        )}
+  return <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Binary</h1>
+        <p className="text-gray-600">Yes/no, that's all</p>
       </div>
+
+      <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <input type="text" value={inputText} onChange={e=>setInputText(e.target.value)} placeholder="What did you experience?" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none" disabled={isProcessing}/>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={()=>addItem('like')} disabled={!inputText.trim()||isProcessing} className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"><ThumbsUp />{isProcessing?'Processing...':'Like'}</button>
+          <button onClick={()=>addItem('dislike')} disabled={!inputText.trim()||isProcessing} className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"><ThumbsDown />{isProcessing?'Processing...':'Dislike'}</button>
+        </div>
+      </div>
+
+      {items.length>0 && <div className="bg-white rounded-2xl shadow-lg p-4 mb-6 flex flex-wrap gap-2">{categories.map(cat=><button key={cat} onClick={()=>setSelectedCategory(cat)} className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory===cat?'bg-purple-500 text-white':'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{cat}</button>)}</div>}
+
+      <div className="space-y-3">
+        {filteredItems.length===0?<div className="bg-white rounded-2xl shadow-lg p-12 text-center"><p className="text-gray-500">{items.length===0?"No ratings yet.":"No items in this category yet."}</p></div>:
+        filteredItems.map(item=><div key={item.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>{getRatingEmoji(item.rating)} {item.rating==='like'?'Liked':'Disliked'}</span>
+                <select value={item.category} onChange={e=>updateCategory(item.id,e.target.value)} className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700">{ALL_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select>
+              </div>
+              <p className="text-gray-800 font-medium mb-1">{item.text}</p>
+              <p className="text-sm text-gray-500">{item.date}</p>
+              {editingComment===item.id?
+              <div className="mt-3 space-y-2">
+                <textarea value={commentText} onChange={e=>setCommentText(e.target.value)} placeholder="Add your thoughts..." className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none" rows="3" autoFocus/>
+                <div className="flex gap-2"><button onClick={()=>saveComment(item.id)} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors">Save</button>
+                <button onClick={cancelEditingComment} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">Cancel</button></div>
+              </div>:
+              <>
+                {item.comment && <div className="mt-2 p-3 bg-gray-50 rounded-lg"><p className="text-sm text-gray-700 italic">{item.comment}</p></div>}
+                <button onClick={()=>startEditingComment(item)} className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"><MessageSquare />{item.comment?'Edit comment':'Add comment'}</button>
+              </>}
+            </div>
+            <button onClick={()=>deleteItem(item.id)} className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 /></button>
+          </div>
+        </div>)}
+      </div>
+
+      {items.length>0 && <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
+        <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center p-4 bg-green-50 rounded-xl"><div className="text-3xl font-bold text-green-600">{items.filter(i=>i.rating==='like').length}</div><div className="text-sm text-gray-600">Liked</div></div>
+          <div className="text-center p-4 bg-red-50 rounded-xl"><div className="text-3xl font-bold text-red-600">{items.filter(i=>i.rating==='dislike').length}</div><div className="text-sm text-gray-600">Disliked</div></div>
+        </div>
+      </div>}
+
     </div>
-  );
+  </div>;
 }
 
-ReactDOM.render(<BinaryApp />, document.getElementById('root'));
+ReactDOM.render(<BinaryApp />,document.getElementById('root'));
 </script>
+
+<!-- Include tiny GPT4All Mini -->
+<script src="https://gpt4all.io/mini/gpt4all-mini.js"></script>
+<script>
+window.gpt4allMini = new GPT4AllMini({ modelUrl: "models/gpt4all-mini.gguf" }); 
+</script>
+
 </body>
 </html>
