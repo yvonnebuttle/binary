@@ -255,6 +255,7 @@ async function detectCategorySmart(text, userLat, userLng) {
             const newItems = items.filter(item => item.id !== id);
             setItems(newItems);
             saveItems(newItems);
+                };
 
           const startEditingComment = (item) => {
             setEditingComment(item.id);
