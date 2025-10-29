@@ -100,93 +100,156 @@ async function detectMovieTitle(text) {
   }
   return null;
 }
-        function BinaryApp() {
-          const [items, setItems] = useState([]);
-          const [inputText, setInputText] = useState('');
-          const [selectedCategory, setSelectedCategory] = useState('All');
-          const [isLoading, setIsLoading] = useState(true);
-          const [editingComment, setEditingComment] = useState(null);
-          const [commentText, setCommentText] = useState('');
+       function BinaryApp() {
+  const { useState, useEffect } = React;
+  const [items, setItems] = useState([]);
+  const [inputText, setInputText] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isLoading, setIsLoading] = useState(true);
+  const [editingComment, setEditingComment] = useState(null);
+  const [commentText, setCommentText] = useState('');
 
-          useEffect(() => {
-            loadItems();
-          }, []);
+  // --- Load items and get geolocation ---
+  useEffect(() => {
+    loadItems();
 
-          const loadItems = () => {
-            try {
-              const stored = localStorage.getItem('binaryItems');
-              if (stored) {
-                setItems(JSON.parse(stored));
-              }
-            } catch (error) {
-              console.error('Error loading items:', error);
-            }
-            setIsLoading(false);
-          };
+    // Get user location for proximity scoring
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        window.userLat = pos.coords.latitude;
+        window.userLng = pos.coords.longitude;
+      },
+      err => console.warn('Location access denied:', err)
+    );
+  }, []);
 
-          const saveItems = (newItems) => {
-            try {
-              localStorage.setItem('binaryItems', JSON.stringify(newItems));
-            } catch (error) {
-              console.error('Error saving items:', error);
-              alert('Failed to save. Storage might be full.');
-            }
-          };
+  const loadItems = () => {
+    try {
+      const stored = localStorage.getItem('binaryItems');
+      if (stored) setItems(JSON.parse(stored));
+    } catch (error) {
+      console.error('Error loading items:', error);
+    }
+    setIsLoading(false);
+  };
 
-          const detectCategory = (text) => {
-            const lower = text.toLowerCase();
-            
-            const categories = {
-              'Food': ['restaurant', 'meal', 'dinner', 'lunch', 'breakfast', 'food', 'dish', 'ate', 'eating'],
-              'Cheese': ['cheese', 'brie', 'cheddar', 'gouda', 'mozzarella', 'parmesan'],
-              'Coffee': ['coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'americano'],
-            'Places': ['visited', 'trip', 'travel', 'vacation', 'holiday', 'beach', 'town', 'city', 'park', 'museum', 'bar', 'club', 'venue'],
-              'Dates': ['date', 'dating', 'went out', 'met up'],
-              'People': ['person', 'friend', 'met', 'someone', 'colleague'],
-              'Sports': ['tennis', 'game', 'played', 'match', 'workout', 'exercise', 'gym'],
-              'Entertainment': ['movie', 'show', 'series', 'book', 'music', 'concert', 'watched', 'read'],
-            };
+  const saveItems = (newItems) => {
+    try {
+      localStorage.setItem('binaryItems', JSON.stringify(newItems));
+    } catch (error) {
+      console.error('Error saving items:', error);
+      alert('Failed to save. Storage might be full.');
+    }
+  };
 
-            for (const [category, keywords] of Object.entries(categories)) {
-              if (keywords.some(keyword => lower.includes(keyword))) {
-                return category;
-              }
-            }
-            
-            return 'Other';
-          };
-
-         const addItem = async (rating) => {
-  if (!inputText.trim()) return;
-
-  try {
-    let category = null;
+  // --- Smart category detection ---
+  async function detectCategorySmart(text, userLat, userLng) {
+    // 1️⃣ Google Places detection
     if (window.google && window.google.maps) {
-      category = await detectPlaceCategory(inputText);
+      try {
+        const placeCat = await new Promise((resolve) => {
+          const service = new google.maps.places.AutocompleteService();
+          service.getPlacePredictions(
+            { input: text, types: ['establishment'] },
+            (predictions, status) => {
+              if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length) {
+                resolve(null);
+                return;
+              }
+              const first = predictions[0];
+              const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+              detailsService.getDetails({ placeId: first.place_id, fields: ['types', 'geometry'] }, (place, detailsStatus) => {
+                if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
+                  // Optional: boost confidence if nearby
+                  let nearbyBoost = 0;
+                  if (userLat && userLng && place.geometry?.location) {
+                    const dLat = place.geometry.location.lat() - userLat;
+                    const dLng = place.geometry.location.lng() - userLng;
+                    const dist = Math.sqrt(dLat*dLat + dLng*dLng);
+                    if (dist < 0.02) nearbyBoost = 1; // ~2 km threshold
+                  }
+
+                  if (place.types.includes('cafe') || place.types.includes('coffee_shop')) resolve({ cat:'Coffee', conf: 0.8 + nearbyBoost });
+                  else if (place.types.includes('restaurant')) resolve({ cat:'Food', conf:0.8 + nearbyBoost });
+                  else if (place.types.includes('bar')) resolve({ cat:'Beverages', conf:0.8 + nearbyBoost });
+                  else if (place.types.includes('park') || place.types.includes('museum') || place.types.includes('tourist_attraction'))
+                    resolve({ cat:'Places', conf:0.7 + nearbyBoost });
+                  else resolve({ cat:null, conf:0 });
+                } else resolve({ cat:null, conf:0 });
+              });
+            }
+          );
+        });
+        if (placeCat?.cat && placeCat.conf >= 0.75) return placeCat.cat;
+      } catch(err){ console.warn('Google Places detection failed', err);}
     }
 
-    if (!category || category === 'Other') {
-      category = detectCategory(inputText);
-    }
+    // 2️⃣ Book detection
+    try {
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}`);
+      const data = await res.json();
+      if (data.totalItems > 0) {
+        const first = data.items[0].volumeInfo;
+        if (first.title && text.toLowerCase().includes(first.title.toLowerCase().split(' ')[0])) {
+          return 'Books';
+        }
+      }
+    } catch(err){ console.warn('Book detection failed', err); }
 
-    const newItem = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      rating,
-      category,
-      timestamp: Date.now(),
-      date: new Date().toLocaleDateString()
+    // 3️⃣ Movie detection (TMDB)
+    const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8'; // your TMDB key
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const first = data.results[0];
+        if (first.title && text.toLowerCase().includes(first.title.toLowerCase().split(' ')[0])) {
+          return 'Movies';
+        }
+      }
+    } catch(err){ console.warn('Movie detection failed', err); }
+
+    // 4️⃣ Keyword fallback
+    const lower = text.toLowerCase();
+    const categories = {
+      'Food': ['restaurant','meal','dinner','lunch','breakfast','food','dish','ate','eating'],
+      'Cheese': ['cheese','brie','cheddar','gouda','mozzarella','parmesan'],
+      'Coffee': ['coffee','cafe','espresso','latte','cappuccino','americano'],
+      'Places': ['visited','trip','travel','vacation','holiday','beach','town','city','park','museum','bar','club','venue'],
+      'Dates': ['date','dating','went out','met up'],
+      'People': ['person','friend','met','someone','colleague'],
+      'Sports': ['tennis','game','played','match','workout','exercise','gym'],
+      'Entertainment': ['movie','show','series','book','music','concert','watched','read'],
     };
+    for (const [cat, keywords] of Object.entries(categories)) {
+      if (keywords.some(k => lower.includes(k))) return cat;
+    }
 
-    const newItems = [newItem, ...items];
-    setItems(newItems);
-    saveItems(newItems);
-    setInputText('');
-  } catch (err) {
-    console.error('Error adding item:', err);
-    alert('Failed to add item. Try again.');
+    return 'Other';
   }
-};
+
+  // --- Add item ---
+  const addItem = async (rating) => {
+    if (!inputText.trim()) return;
+    try {
+      const category = await detectCategorySmart(inputText, window.userLat, window.userLng);
+      const newItem = {
+        id: Date.now().toString(),
+        text: inputText.trim(),
+        rating,
+        category,
+        timestamp: Date.now(),
+        date: new Date().toLocaleDateString()
+      };
+      const newItems = [newItem, ...items];
+      setItems(newItems);
+      saveItems(newItems);
+      setInputText('');
+    } catch(err) {
+      console.error('Error adding item:', err);
+      alert('Failed to add item. Try again.');
+    }
+  };
 
           const deleteItem = (id) => {
             const newItems = items.filter(item => item.id !== id);
