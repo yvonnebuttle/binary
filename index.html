@@ -151,7 +151,13 @@ async function detectCategory(inputText, userLat, userLng) {
                     if (dist < 5) nearbyBoost = 0.2;
                   }
 
-                  const typeMap = { cafe:'Coffee', bar:'Beverages', pub:'Beverages', restaurant:'Food' };
+                  const typeMap = { cafe:'Coffee', bar:'Beverages', pub:'Beverages', restaurant:'Food', park:'Places',
+                  museum:'Places',
+                  tourist_attraction:'Places',
+                  locality:'Places',
+                  sublocality:'Places',
+                  administrative_area_level_1:'Places',
+                  country:'Places' };
                   let baseCat = null;
                   for (let t of place.types) if (typeMap[t]) { baseCat = typeMap[t]; break; }
                   if (!baseCat && place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','locality','sublocality','administrative_area_level_1','establishment'].includes(t)))
