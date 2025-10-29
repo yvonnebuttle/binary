@@ -65,6 +65,41 @@ async function detectPlaceCategory(text) {
     );
   });
 }
+        // === Google Books API category detection ===
+async function detectBookTitle(text) {
+  try {
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}`);
+    const data = await res.json();
+    if (data.totalItems > 0) {
+      const first = data.items[0].volumeInfo;
+      // Basic fuzzy match — does input contain first word of title?
+      if (first.title && text.toLowerCase().includes(first.title.toLowerCase().split(' ')[0])) {
+        return 'Books';
+      }
+    }
+  } catch (err) {
+    console.error('Book detection failed:', err);
+  }
+  return null;
+}
+
+// === TMDB API category detection ===
+async function detectMovieTitle(text) {
+  const apiKey = '559458ec6b7148bf5d8a39f7224a2fb8'; // 👈 Replace with your TMDB API key
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(text)}`);
+    const data = await res.json();
+    if (data.results && data.results.length > 0) {
+      const first = data.results[0];
+      if (first.title && text.toLowerCase().includes(first.title.toLowerCase().split(' ')[0])) {
+        return 'Movies';
+      }
+    }
+  } catch (err) {
+    console.error('Movie detection failed:', err);
+  }
+  return null;
+}
         function BinaryApp() {
           const [items, setItems] = useState([]);
           const [inputText, setInputText] = useState('');
