@@ -75,65 +75,64 @@ async function detectCategory(inputText, userLat, userLng) {
     console.warn("Movies API failed:", err);
   }
 
-  // ---- 3️⃣ Google Places ----
+// --- Google Places detection ---
+if (window.google && window.google.maps) {
   try {
-    const mapsRes = await fetch(
-      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(text)}&inputtype=textquery&fields=name,geometry,types&locationbias=point:${userLat},${userLng}&key=YOUR_GOOGLE_PLACES_KEY`
-    );
-    const mapsData = await mapsRes.json();
-    if (mapsData.candidates && mapsData.candidates.length > 0) {
-      const place = mapsData.candidates[0];
-      const types = place.types || [];
-      let score = 0.5; // default confidence for generic place
-      if (types.some(t => ["restaurant", "bar", "cafe"].includes(t))) {
-        score = 0.8;
-        isFoodPlaceNearby = true;
-      } else if (types.some(t => ["point_of_interest", "establishment"].includes(t))) {
-        score = 0.6;
-        isGenericPlaceNearby = true;
-      }
-      if (place.geometry && place.geometry.location && userLat && userLng) {
-        placeDistance = distanceKm(userLat, userLng, place.geometry.location.lat, place.geometry.location.lng);
-        if (placeDistance < 5) score += 0.2; // proximity boost
-      }
-      confidence.Places = score;
-    }
+    const placeCat = await new Promise(resolve => {
+      const service = new google.maps.places.AutocompleteService();
+      service.getPlacePredictions(
+        { input: text, types: ['establishment'] },
+        (predictions, status) => {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length)
+            return resolve(null);
+
+          const first = predictions[0];
+          const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+          detailsService.getDetails({ placeId: first.place_id, fields: ['types', 'geometry'] },
+            (place, detailsStatus) => {
+              if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
+                let distKm = 999;
+                let nearbyBoost = 0;
+
+                if (userLat && userLng && place.geometry?.location) {
+                  const R = 6371; // Earth radius in km
+                  const dLat = (place.geometry.location.lat() - userLat) * Math.PI / 180;
+                  const dLng = (place.geometry.location.lng() - userLng) * Math.PI / 180;
+                  const a = Math.sin(dLat/2)**2 + Math.cos(userLat*Math.PI/180) * Math.cos(place.geometry.location.lat()*Math.PI/180) * Math.sin(dLng/2)**2;
+                  distKm = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+                  if (distKm < 5) nearbyBoost = 0.2; // within 5 km
+                }
+
+                let baseCat = null;
+                if (place.types.includes('cafe')) baseCat = 'Coffee';
+                else if (place.types.includes('bar') || place.types.includes('pub')) baseCat = 'Beverages';
+                else if (place.types.includes('restaurant')) baseCat = 'Food';
+                else if (place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','establishment'].includes(t)))
+                  baseCat = 'Places';
+
+                if (baseCat) {
+                  resolve({ category: baseCat, confidence: 0.6 + nearbyBoost });
+                } else {
+                  resolve(null);
+                }
+              } else resolve(null);
+            }
+          );
+        }
+      );
+    });
+
+    if (placeCat) return placeCat.category;
   } catch (err) {
-    console.warn("Places API failed:", err);
+    console.warn('Places detection failed', err);
   }
-
-  // ---- 4️⃣ Keyword fallback for Food ----
-  const foodKeywords = ["restaurant", "cheese", "ramen", "blueberry", "coffee", "pizza", "bread", "fruit", "food", "snack"];
-  if (foodKeywords.some(k => lower.includes(k))) confidence.Food = 0.6;
-
-  // ---- 5️⃣ Proximity Overrides ----
-  // If near food or place, boost them above Books/Movies
-  if (placeDistance !== null && placeDistance < 5) {
-    if (isFoodPlaceNearby) confidence.Food = Math.max(confidence.Food, 0.9);
-    if (isGenericPlaceNearby) confidence.Places = Math.max(confidence.Places, 0.9);
-    // dampen Books/Movies if a nearby place exists
-    confidence.Books = Math.min(confidence.Books, 0.5);
-    confidence.Movies = Math.min(confidence.Movies, 0.5);
-  }
-
-  // ---- 6️⃣ Final Decision ----
-  const sorted = Object.entries(confidence).sort((a, b) => b[1] - a[1]);
-  let [bestCat, bestScore] = sorted[0];
-  if (bestScore < 0.4) bestCat = "Other";
-
-  return { category: bestCat, confidence: bestScore.toFixed(2), confidenceMap: confidence, distance: placeDistance };
 }
-
-// Helper for proximity boost
-function distanceKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    
+ // --- Fallback keyword check for generic foods ---
+const foodKeywords = ["restaurant", "cheese", "ramen", "blueberry", "coffee", "pizza", "bread", "fruit", "food", "snack"];
+if (foodKeywords.some(k => lower.includes(k)) && !confidence.Food) {
+  confidence.Food = 0.5;
 }
 
 // === Main App ===
