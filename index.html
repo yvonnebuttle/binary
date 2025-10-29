@@ -49,61 +49,49 @@ function saveCache() {
   catch(err){ console.warn(err); }
 }
 
-// Enhanced keyword patterns with specificity
+// Enhanced keyword patterns
 const CATEGORY_KEYWORDS = {
   Cheese: {
     exact: ["cheese","cheddar","brie","gouda","mozzarella","parmesan","feta","camembert","gruyere","manchego","pecorino","ricotta","stilton","roquefort","gorgonzola","emmental","havarti","provolone"],
-    score: 0.8
   },
   Coffee: {
     exact: ["coffee","cafe","latte","espresso","cappuccino","americano","macchiato","mocha","flat white","cortado","affogato"],
     partial: ["starbucks","costa","cafe nero","pret"],
-    score: 0.7
   },
   Beverages: {
     exact: ["bar","pub","cocktail","brewery","beer","wine","gin","vodka","whiskey","rum","tequila","ale","lager","cider","spirits","champagne","prosecco"],
     partial: ["taproom","brewpub","tavern","lounge"],
-    score: 0.7
   },
   Food: {
     exact: ["restaurant","ramen","pizza","burger","pasta","sushi","taco","curry","noodles","sandwich","steak","chicken","seafood","bakery","diner","bistro"],
     partial: ["cuisine","eatery","grill","kitchen"],
-    score: 0.6
   },
   Places: {
     exact: ["museum","park","beach","monument","gallery","plaza","square","garden","island","mountain","lake","resort","castle","palace","temple","cathedral"],
     partial: ["tourist","attraction","landmark","historic"],
-    score: 0.5
   },
   Books: {
     exact: ["novel","memoir","biography","poetry","textbook"],
     partial: ["author","reading","literature"],
-    score: 0.6
   },
   Movies: {
     exact: ["film","cinema","documentary","series","episode"],
     partial: ["actor","director","netflix","disney"],
-    score: 0.5
   },
   Things: {
     exact: ["shoes","bike","sneakers","jacket","laptop","bag","phone","watch","headphones","camera","tablet","keyboard","backpack","suitcase","umbrella"],
-    score: 0.6
   },
   Sports: {
     exact: ["football","soccer","basketball","tennis","cricket","rugby","baseball","hockey","golf","swimming","match","championship","tournament","surfing","skiing","snowboarding","skateboarding","climbing","hiking","running","cycling","yoga","pilates","boxing","wrestling","martial arts","karate","judo","gymnastics","athletics","track","field"],
-    score: 0.7
   },
   Dates: {
     exact: ["date","dating","romantic","anniversary","valentine","proposal","engagement","wedding","relationship","boyfriend","girlfriend","partner","spouse"],
-    score: 0.7
   },
   People: {
     exact: ["person","friend","colleague","coworker","manager","boss","teacher","professor","doctor","nurse","artist","musician","celebrity","politician","athlete","neighbor","roommate","classmate"],
-    score: 0.6
   },
   Entertainment: {
     exact: ["concert","festival","show","performance","theater","theatre","comedy","stand-up","magic","circus","exhibition","gig","club","nightclub","disco","rave","party","event"],
-    score: 0.6
   }
 };
 
@@ -131,7 +119,7 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-// === Smart category detection with popularity & proximity ===
+// === Smart category detection: Google Maps FIRST, then keywords, then Other ===
 async function detectCategory(inputText, userLat, userLng) {
   const text = inputText.trim();
   if (!text) return 'Other';
@@ -141,76 +129,15 @@ async function detectCategory(inputText, userLat, userLng) {
   // Check cache first
   if (categoryCache[text]) return categoryCache[text];
 
-  // Initialize scores
-  const scores = {};
-  ALL_CATEGORIES.forEach(cat => scores[cat] = 0);
-
-  // 1️⃣ Keyword matching (fast, reliable baseline)
-  for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (config.exact?.some(k => lower.includes(k))) {
-      scores[category] = Math.max(scores[category], config.score);
-    }
-    if (config.partial?.some(k => lower.includes(k))) {
-      scores[category] = Math.max(scores[category], config.score * 0.7);
-    }
-  }
-
-  // 2️⃣ Google Books API (popularity weighted)
-  try {
-    const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(text)}&maxResults=5`);
-    const bookData = await bookRes.json();
-    
-    if (bookData.items?.length) {
-      const bestMatch = bookData.items[0];
-      const title = bestMatch.volumeInfo.title?.toLowerCase() || '';
-      const titleMatch = title === lower || title.includes(lower);
-      
-      // Score based on match quality and popularity
-      const ratingCount = bestMatch.volumeInfo.ratingsCount || 0;
-      const avgRating = bestMatch.volumeInfo.averageRating || 0;
-      const popularity = Math.min((ratingCount / 100) * avgRating, 10) / 10;
-      
-      if (titleMatch) {
-        scores.Books = Math.max(scores.Books, 0.7 + (popularity * 0.2));
-      } else if (bookData.items.length >= 3) {
-        scores.Books = Math.max(scores.Books, 0.4 + (popularity * 0.1));
-      }
-    }
-  } catch(err){ console.warn("Books API failed:", err); }
-
-  // 3️⃣ TMDB Movies API (popularity weighted, but lower than books)
-  try {
-    const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8';
-    const movieRes = await fetch(
-      `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`
-    );
-    const movieData = await movieRes.json();
-    
-    if (movieData.results?.length) {
-      const bestMatch = movieData.results[0];
-      const title = bestMatch.title?.toLowerCase() || '';
-      const titleMatch = title === lower || title.includes(lower);
-      
-      // Movies get slightly lower base score than books
-      const popularity = Math.min(bestMatch.popularity / 100, 1);
-      
-      if (titleMatch) {
-        scores.Movies = Math.max(scores.Movies, 0.6 + (popularity * 0.2));
-      } else if (movieData.results.length >= 3) {
-        scores.Movies = Math.max(scores.Movies, 0.35 + (popularity * 0.1));
-      }
-    }
-  } catch(err){ console.warn("Movies API failed:", err); }
-
-  // 4️⃣ Google Places API (proximity heavily weighted for LOCAL places only)
+  // 1️⃣ PRIORITY: Google Places API within 2km
   try {
     await waitForGoogleMaps();
-    if (window.google?.maps) {
+    if (window.google?.maps && userLat && userLng) {
       const service = new google.maps.places.AutocompleteService();
 
       const predictions = await new Promise(resolve => {
         service.getPlacePredictions({ input: text }, (preds, status) => {
-          resolve(status === google.maps.places.PlacesServiceStatus.OK ? preds?.slice(0, 3) : []);
+          resolve(status === google.maps.places.PlacesServiceStatus.OK ? preds?.slice(0, 5) : []);
         });
       });
 
@@ -220,84 +147,77 @@ async function detectCategory(inputText, userLat, userLng) {
         const placeResults = await Promise.all(predictions.map(p => new Promise(res => {
           detailsService.getDetails({ 
             placeId: p.place_id, 
-            fields: ['types', 'geometry', 'user_ratings_total', 'rating', 'name']
+            fields: ['types', 'geometry', 'name']
           }, place => res(place));
         })));
 
+        // Find places within 2km
         for (const place of placeResults) {
-          if (!place?.types) continue;
+          if (!place?.types || !place.geometry?.location) continue;
 
-          let distance = Infinity;
-          let proximityBoost = 0;
-          
-          // Check if this is a major place (city, country, famous landmark)
-          const isMajorPlace = place.types.some(t => 
-            ['locality', 'country', 'administrative_area_level_1', 'natural_feature', 
-             'continent', 'archipelago', 'colloquial_area'].includes(t)
+          const distance = distanceKm(
+            userLat, userLng, 
+            place.geometry.location.lat(), 
+            place.geometry.location.lng()
           );
-          
-          if (userLat && userLng && place.geometry?.location) {
-            distance = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
-            
-            // Only apply proximity boost for LOCAL businesses, not major places
-            if (!isMajorPlace) {
-              if (distance < 1) proximityBoost = 0.5;
-              else if (distance < 5) proximityBoost = 0.3;
-              else if (distance < 20) proximityBoost = 0.15;
-            }
-          }
 
-          // Popularity from reviews
-          const reviewCount = place.user_ratings_total || 0;
-          const avgRating = place.rating || 0;
-          const popularity = Math.min((reviewCount / 500) * (avgRating / 5), 1);
+          // Only consider places within 2km
+          if (distance <= 2) {
+            // Type mapping
+            const typeMap = {
+              cafe: 'Coffee',
+              bar: 'Beverages',
+              night_club: 'Beverages',
+              restaurant: 'Food',
+              meal_takeaway: 'Food',
+              meal_delivery: 'Food',
+              food: 'Food',
+              bakery: 'Food',
+              museum: 'Places',
+              park: 'Places',
+              tourist_attraction: 'Places',
+              point_of_interest: 'Places',
+              establishment: 'Places'
+            };
 
-          // Name match bonus
-          const nameMatch = place.name?.toLowerCase().includes(lower) ? 0.2 : 0;
-
-          // Type mapping with base scores
-          const typeMap = {
-            cafe: { cat: 'Coffee', base: 0.7 },
-            bar: { cat: 'Beverages', base: 0.7 },
-            night_club: { cat: 'Beverages', base: 0.7 },
-            restaurant: { cat: 'Food', base: 0.65 },
-            meal_takeaway: { cat: 'Food', base: 0.6 },
-            food: { cat: 'Food', base: 0.6 },
-            museum: { cat: 'Places', base: 0.7 },
-            park: { cat: 'Places', base: 0.7 },
-            tourist_attraction: { cat: 'Places', base: 0.7 },
-            natural_feature: { cat: 'Places', base: 0.75 },
-            locality: { cat: 'Places', base: 0.8 },      // Cities get HIGH base score
-            country: { cat: 'Places', base: 0.85 },       // Countries get HIGHEST score
-            administrative_area_level_1: { cat: 'Places', base: 0.75 }, // States/regions
-            continent: { cat: 'Places', base: 0.85 },
-            archipelago: { cat: 'Places', base: 0.75 },
-            colloquial_area: { cat: 'Places', base: 0.7 }
-          };
-
-          for (const type of place.types) {
-            const mapping = typeMap[type];
-            if (mapping) {
-              const score = mapping.base + proximityBoost + (popularity * 0.1) + nameMatch;
-              scores[mapping.cat] = Math.max(scores[mapping.cat], score);
+            for (const type of place.types) {
+              if (typeMap[type]) {
+                const category = typeMap[type];
+                categoryCache[text] = category;
+                saveCache();
+                console.log(`✅ Matched via Google Maps (<2km): "${text}" → ${category} (${distance.toFixed(2)}km)`);
+                return category;
+              }
             }
           }
         }
       }
     }
-  } catch(err){ console.warn("Places detection failed:", err); }
+  } catch(err){ 
+    console.warn("Google Maps detection failed:", err); 
+  }
 
-  // 5️⃣ Select best category
-  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  let [bestCat, bestScore] = sorted[0];
-  
-  // Require minimum confidence
-  if (bestScore < 0.3) bestCat = 'Other';
+  // 2️⃣ FALLBACK: Keyword matching
+  for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (config.exact?.some(k => lower.includes(k))) {
+      categoryCache[text] = category;
+      saveCache();
+      console.log(`✅ Matched via keywords: "${text}" → ${category}`);
+      return category;
+    }
+    if (config.partial?.some(k => lower.includes(k))) {
+      categoryCache[text] = category;
+      saveCache();
+      console.log(`✅ Matched via partial keywords: "${text}" → ${category}`);
+      return category;
+    }
+  }
 
-  categoryCache[text] = bestCat;
+  // 3️⃣ LAST RESORT: Other
+  categoryCache[text] = 'Other';
   saveCache();
-
-  return bestCat;
+  console.log(`ℹ️ No match found: "${text}" → Other`);
+  return 'Other';
 }
 
 // === Main App ===
