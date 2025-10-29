@@ -47,7 +47,71 @@ function saveCache() {
   try { localStorage.setItem("categoryCache", JSON.stringify(categoryCache)); }
   catch(err){ console.warn(err); }
 }
+ // --- Google Places Smart Category Detection ---
+    // Helper: wait for Google Maps API
+function waitForGoogleMaps() {
+  return new Promise(resolve => {
+    if (window.google && window.google.maps) return resolve();
+    const interval = setInterval(() => {
+      if (window.google && window.google.maps) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 100);
+  });
+}
+    async function detectCategorySmart(text, userLat, userLng) {
+      const lowerText = text.toLowerCase();
 
+      if (window.google && window.google.maps) {
+        try {
+          // Promise wrapper
+          const placeCat = await new Promise((resolve) => {
+            const service = new google.maps.places.AutocompleteService();
+
+            // --- Helper to call Autocomplete ---
+            function getPredictions(typesArray, callback) {
+              const request = {
+                input: text,
+                types: typesArray
+              };
+              // If location is available, bias results
+              if (userLat && userLng && typesArray.includes('establishment')) {
+                request.location = new google.maps.LatLng(userLat, userLng);
+                request.radius = 2000; // 2 km
+              }
+              service.getPlacePredictions(request, callback);
+            }
+
+            // --- Try establishments first ---
+            getPredictions(['establishment'], (predictions, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
+                const first = predictions[0];
+                const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+                detailsService.getDetails({ placeId: first.place_id, fields: ['types','geometry','name'] }, (place, detailsStatus) => {
+                  if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
+                    if (place.types.includes('cafe')) resolve('Coffee');
+                    else if (place.types.includes('restaurant')) resolve('Food');
+                    else if (place.types.includes('bar')) resolve('Beverages');
+                    else if (place.types.includes('park') || place.types.includes('museum') || place.types.includes('tourist_attraction')) resolve('Places');
+                    else resolve(null);
+                  } else resolve(null);
+                });
+              } else {
+                // --- Try cities/countries ---
+                getPredictions(['(cities)'], (predictions2, status2) => {
+                  if (status2 === google.maps.places.PlacesServiceStatus.OK && predictions2?.length) {
+                    const first = predictions2[0];
+                    resolve('Places'); // Treat cities/countries as Places
+                  } else resolve(null);
+                });
+              }
+            });
+          });
+
+          if (placeCat) return placeCat;
+        } catch(err){ console.warn('Google Places detection failed', err);}
+      }
 // Enhanced keyword patterns
 const CATEGORY_KEYWORDS = {
   Cheese: {
@@ -108,16 +172,6 @@ function waitForGoogleMaps() {
   });
 }
 
-// Helper: compute distance in km
-function distanceKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat/2)**2 +
-    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
 
 // === Smart category detection: Google Maps FIRST, then keywords, then Other ===
 async function detectCategory(inputText, userLat, userLng) {
@@ -199,7 +253,7 @@ async function detectCategory(inputText, userLat, userLng) {
 
   // 2️⃣ FALLBACK: Keyword matching
   for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (config.exact?.some(k => lower.includes(k))) {
+    if (config.exact?.somae(k => lower.includes(k))) {
       categoryCache[text] = category;
       saveCache();
       console.log(`✅ Matched via keywords: "${text}" → ${category}`);
