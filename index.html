@@ -132,7 +132,8 @@ async function detectPlaceCategory(text) {
     }
 
     // Fallback to keyword-based detection if Google Places is not ready
-    if (!category) category = detectCategory(inputText);
+if (!category || category === 'Other') {
+  category = detectCategory(inputText);
 
     const newItem = {
       id: Date.now().toString(),
