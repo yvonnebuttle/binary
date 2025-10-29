@@ -1,30 +1,77 @@
-export const categories = { 'Food & Dining': [
-        'restaurant', 'meal', 'dinner', 'lunch', 'breakfast', 'brunch', 'food', 'dish', 'ate', 'eating',
-        'pizza', 'burger', 'sushi', 'pasta', 'salad', 'sandwich', 'soup', 'steak', 'chicken', 'fish',
-        'seafood', 'vegetarian', 'vegan', 'dessert', 'ice cream', 'bakery', 'deli', 'takeout', 'delivery',
-        'menu', 'ordered', 'chef', 'cuisine', 'thai', 'indian', 'chinese', 'japanese', 'mexican', 'italian',
-        'french', 'Mediterranean', 'bbq', 'grill', 'buffet', 'bistro', 'diner', 'eatery', 'tasted', 'flavor', "restaurant","ramen","pizza","burger","pasta","sushi","taco","curry","noodles","sandwich","steak","chicken","seafood","bakery","diner","bistro","salad","fries","wings","nachos","burrito","falafel","gyro","pho","dim sum","bibimbap","pad thai","massaman curry","neapolitan pizza","peking duck","rendang","som tam","chili crab","cacio e pepe","baklava","guinea pig","escaveche","laksa","escargot","stroganoff","katsu","tempura","onigiri","udon","soba","biryani","dosa","samosa","butter chicken","tikka masala","falooda","poutine","tourtière","boudin","gumbo","jambalaya","beignet","lobster roll","clam chowder","key lime pie","reuben","cheeseburger","hot dog","corn dog","mac and cheese","grilled cheese","BLT","club sandwich","wrap","quesadilla","enchilada","empanada","arepa","pupusa","tamale","ceviche","poke bowl","acai bowl","quinoa bowl","buddha bowl","caesar salad","greek salad","cob salad","potato salad","coleslaw","hummus","tzatziki","guacamole","salsa","chips","popcorn","pretzel","donut","bagel","croissant","muffin","pancake","waffle","french toast","eggs benedict","omelette","quiche","frittata","hash browns","bacon","sausage","ham","turkey","roast beef","pulled pork","brisket","ribs","meatloaf","chili","soup","stew","risotto","paella","couscous","tabbouleh","falafel wrap","shawarma","kebab","souvlaki","moussaka","spanakopita","dolma","borek","knish","latke","blini","pierogi","pelmeni","vareniki","goulash","paprikash","sauerkraut","kimchi","japchae","bulgogi","galbi","hot pot","shabu shabu","sukiyaki","okonomiyaki","takoyaki","gyoza","baozi","xiaolongbao","congee","italian restaurant","chinese restaurant","mexican restaurant","indian restaurant","thai restaurant","japanese restaurant","french bistro","steakhouse","seafood spot","vegetarian eatery","vegan cafe","fast food joint","fine dining","brunch spot","diner breakfast","bbq joint","sushi bar","taco stand","ramen shop","pizza parlor","burger joint","pasta house","curry house","noodle bar","sandwich shop","grill restaurant","rooftop dining","patio seating","family restaurant","romantic dinner spot","quick lunch","takeout order","delivery service","reservation needed","waiter service","chef special","menu variety","portion size","restaurant ambiance","dinner reservation","cuisine","eatery","grill","kitchen"]
-      ,
-      'Cheese': [
-        'cheese', 'brie', 'cheddar', 'gouda', 'mozzarella', 'parmesan', 'feta', 'blue cheese', 'camembert',
-        'gruyere', 'swiss', 'provolone', 'ricotta', 'manchego', 'aged', 'sharp', 'mild', 'soft cheese',
-        'hard cheese', 'cream cheese', 'goat cheese', "cheese","cheddar","brie","gouda","mozzarella","parmesan","feta","camembert","gruyere","manchego","pecorino","ricotta","stilton","roquefort","gorgonzola","emmental","havarti","provolone","parmigiano reggiano","epoisses","swiss","monterey jack","muenster","blue cheese","irish cheddar","buffalo mozzarella","colby jack","edam","pepper jack","goat cheese","colby","emmentaler","cream cheese","comte","american farmhouse cheddar","cottage cheese","grana padano","halloumi","rembrandt gouda","sharp provolone","danish blue","saint albray","appenzeller","mascarpone","tomme de savoie","string cheese","saint marcellin","american cheese","pont l'eveque","mahon","cantal","emmental francais","selles sur cher","neufchatel","morbier","fourme de montbrison","caprice des dieux","reblochon","coulommiers","taleggio","vacherin","beaufort","beaufort alpage","abondance","saint paulin","chaource","livarot","rocamadour","cambozola","oregon blue vein","leonora goat cheese","pimento cheese","banon","cabrales","tete de moine","boerenkaas","emmental de savoie","brocciu","laguiole","limburger","queso de bola","maroilles","stichelton","ossau iraty","saint nectaire","crottin de chavignol","mimolette","pelardon","fourme dambert","fromage frais","bleu du vercors sassenage","cabecou","saint felicien","bleu d'auvergne","bleu de bresse","farmer cheese","hooligan","bleu des causses","cotija","burrata","oaxaca","fontina","asiago","chihuahua","raclette","romano","jarlsberg","mizithra","panela","provel","asadero","dubliner","fontinella","kasseri","paneer","bocconcini","sharp cheddar","mild cheddar","extra sharp cheddar","white cheddar","new york style cheddar","vermont cheddar","aged gouda","young gouda","smoked gouda","goat feta","sheep feta","blue stilton","gorgonzola dolce","gorgonzola piccante","roquefort piquant","danish gorgonzola","cabrales blue","valdeon","tetilla","idiiazabal","roncal","aragon","zamora","la peral","beyaz peynir","kasar peyniri","otlu peynir","tulum peyniri","montasio","scamorza","caciocavallo","provola","stracchino","quadrello di bufala","bitto","dolcelatte","castello blue","wensleydale","cheshire","double gloucester","caerphilly","lanark blue","dunsyre blue","crowdie","caboc","bonchester","dorset blue vinney","shropshire blue","stinking bishop","bartlett","cooper hill","appleby's cheshire","red dragon","yarg","cornish brie","devon blue","ribblesdale","mendip","westcombe"
-      ],
-      'Coffee': [
-        'coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'americano', 'mocha', 'macchiato', 'cortado',
-        'flat white', 'cold brew', 'iced coffee', 'frappuccino', 'starbucks', 'barista', 'brew', 'roast',
-        'tea', 'chai', 'matcha', 'green tea', 'black tea', 'herbal tea', 'boba', 'bubble tea'
-      ],
-      'Beverages': [
-        'drink', 'beverage', 'cocktail', 'beer', 'wine', 'whiskey', 'vodka', 'gin', 'rum', 'tequila',
-        'margarita', 'mojito', 'martini', 'bar', 'pub', 'brewery', 'winery', 'spirits', 'alcohol',
-        'juice', 'smoothie', 'shake', 'soda', 'water', 'sparkling', "bar","pub","cocktail","brewery","beer","wine","gin","vodka","whiskey","rum","tequila","ale","lager","cider","spirits","champagne","prosecco","martini","margarita","mojito","old fashioned","negroni","daiquiri","manhattan","cosmopolitan","bloody mary","pina colada","mai tai","zombie","espresso martini","irish coffee","white russian","black russian","screwdriver","vodka tonic","gin and tonic","whiskey sour","rum and coke","tequila sunrise","blue lagoon","sex on the beach","long island iced tea","appletini","lemon drop","godfather","rusty nail","french 75","sidecar","sazerac","aviation","last word","paper plane","penicillin","naked and famous","oaxaca old fashioned","vesper","vesper martini","dirty martini","dry martini","wet martini","perfect martini","vodka martini","gibson","rob roy","boulevardier","blood and sand","angel's share","jack rose","monkey gland","between the sheets","el presidente","daiquiri no 3","mary pickford","zombie 1934","painkiller","dark n stormy","moscow mule","paloma","ranch water","texas ranger","bloody maria","michelada","caipirinha","caipiroska","batida","batanga","el diablo","mule","kentucky mule","gin mule","irish mule","ginger mule","kentucky colonel","mint julep","el toro","cuba libre","sea breeze","bay breeze","cape codder","madras","harvey wallbanger","fuzzy navel","tootsie roll","kamikaze","b-52","tequila sunrise","blue hawaiian","hawaiian punch","strawberry daiquiri","frozen margarita","frozen daiquiri","frozen mudslide","grasshopper","mudslide","chocolate martini","dive bar","rooftop bar","sports bar","wine bar","craft cocktail bar","happy hour","pub trivia","karaoke bar","live music pub","bar patio","speakeasy","tiki bar","irish pub","microbrewery taproom","bar snacks","nuts mix","olives","cheese board","charcuterie","pretzel bites","wings platter","pub fries","onion rings","trivia night","poker night","bartender service","bar vibe","crowded pub", "taproom","brewpub","tavern","lounge"
-      ],
-      'Dates': [
-        'date', 'dating', 'went out', 'met up', 'tinder', 'bumble', 'hinge', 'match', 'romance', 'romantic',
-        'boyfriend', 'girlfriend', 'partner', 'seeing someone', 'relationship', 'first date', 'second date',
-        'coffee date', 'dinner date', 'dating app', 'setup', 'blind date', 'speed dating', "date","dating","romantic","anniversary","valentine","proposal","engagement","wedding","relationship","boyfriend","girlfriend","partner","spouse","movie night","dinner date","picnic","beach walk","hike","museum visit","concert","wine tasting","cooking class","stargazing","amusement park","spa day","rooftop bar","art gallery","bike ride","kayaking","pottery class","bookstore browse","farmers market","sunset cruise","dance lesson","escape room","hot air balloon","couples massage","theater show","ice skating","candlelit dinner","road trip","volunteer together","game night","yoga class","photo shoot","baking together","gardening","puzzle night","live music","trivia night","bowling","mini golf","rooftop yoga","sunrise hike","valentine's dinner","anniversary trip","proposal spot","engagement party","wedding venue","romantic getaway","couple's retreat","love letter exchange","memory lane walk","future planning date"
-      ],
+export const categories = {
+  'Food & Dining': [
+    'restaurant', 'meal', 'dinner', 'lunch', 'breakfast', 'brunch', 'food', 'dish', 'ate', 'eating',
+    'pizza', 'burger', 'sushi', 'pasta', 'salad', 'sandwich', 'soup', 'steak', 'chicken', 'fish',
+    'seafood', 'vegetarian', 'vegan', 'dessert', 'ice cream', 'bakery', 'deli', 'takeout', 'delivery',
+    'menu', 'ordered', 'chef', 'cuisine', 'thai', 'indian', 'chinese', 'japanese', 'mexican', 'italian',
+    'french', 'Mediterranean', 'bbq', 'grill', 'buffet', 'bistro', 'diner', 'eatery', 'tasted', 'flavor',
+    'ramen', 'taco', 'curry', 'noodles', 'fries', 'wings', 'nachos', 'burrito', 'falafel', 'gyro', 'pho',
+    'dim sum', 'bibimbap', 'pad thai', 'massaman curry', 'neapolitan pizza', 'peking duck', 'rendang',
+    'som tam', 'chili crab', 'cacio e pepe', 'baklava', 'guinea pig', 'escaveche', 'laksa', 'escargot',
+    'stroganoff', 'katsu', 'tempura', 'onigiri', 'udon', 'soba', 'biryani', 'dosa', 'samosa',
+    'butter chicken', 'tikka masala', 'falooda', 'poutine', 'tourtière', 'boudin', 'gumbo', 'jambalaya',
+    'beignet', 'lobster roll', 'clam chowder', 'key lime pie', 'reuben', 'cheeseburger', 'hot dog',
+    'corn dog', 'mac and cheese', 'grilled cheese', 'BLT', 'club sandwich', 'wrap', 'quesadilla',
+    'enchilada', 'empanada', 'arepa', 'pupusa', 'tamale', 'ceviche', 'poke bowl', 'acai bowl',
+    'quinoa bowl', 'buddha bowl', 'caesar salad', 'greek salad', 'cob salad', 'potato salad', 'coleslaw',
+    'hummus', 'tzatziki', 'guacamole', 'salsa', 'chips', 'popcorn', 'pretzel', 'donut', 'bagel', 'croissant',
+    'muffin', 'pancake', 'waffle', 'french toast', 'eggs benedict', 'omelette', 'quiche', 'frittata',
+    'hash browns', 'bacon', 'sausage', 'ham', 'turkey', 'roast beef', 'pulled pork', 'brisket', 'ribs',
+    'meatloaf', 'chili', 'stew', 'risotto', 'paella', 'couscous', 'tabbouleh', 'falafel wrap', 'shawarma',
+    'kebab', 'souvlaki', 'moussaka', 'spanakopita', 'dolma', 'borek', 'knish', 'latke', 'blini', 'pierogi',
+    'pelmeni', 'vareniki', 'goulash', 'paprikash', 'sauerkraut', 'kimchi', 'japchae', 'bulgogi', 'galbi',
+    'hot pot', 'shabu shabu', 'sukiyaki', 'okonomiyaki', 'takoyaki', 'gyoza', 'baozi', 'xiaolongbao',
+    'congee', 'italian restaurant', 'chinese restaurant', 'mexican restaurant', 'indian restaurant',
+    'thai restaurant', 'japanese restaurant', 'french bistro', 'steakhouse', 'seafood spot', 'vegetarian eatery',
+    'vegan cafe', 'fast food joint', 'fine dining', 'brunch spot', 'diner breakfast', 'bbq joint',
+    'sushi bar', 'taco stand', 'ramen shop', 'pizza parlor', 'burger joint', 'pasta house', 'curry house',
+    'noodle bar', 'sandwich shop', 'grill restaurant', 'rooftop dining', 'patio seating', 'family restaurant',
+    'romantic dinner spot', 'quick lunch', 'takeout order', 'delivery service', 'reservation needed',
+    'waiter service', 'chef special', 'menu variety', 'portion size', 'restaurant ambiance', 'dinner reservation',
+    'cuisine', 'eatery', 'grill', 'kitchen'
+  ],
+  'Cheese': [
+    'cheese', 'brie', 'cheddar', 'gouda', 'mozzarella', 'parmesan', 'feta', 'blue cheese', 'camembert',
+    'gruyere', 'swiss', 'provolone', 'ricotta', 'manchego', 'aged', 'sharp', 'mild', 'soft cheese',
+    'hard cheese', 'cream cheese', 'goat cheese', 'pecorino', 'stilton', 'roquefort', 'gorgonzola',
+    'emmental', 'havarti', 'parmigiano reggiano', 'epoisses', 'monterey jack', 'muenster', 'irish cheddar',
+    'buffalo mozzarella', 'colby jack', 'edam', 'pepper jack', 'colby', 'emmentaler', 'comte',
+    'american farmhouse cheddar', 'cottage cheese', 'grana padano', 'halloumi', 'rembrandt gouda',
+    'sharp provolone', 'danish blue', 'saint albray', 'appenzeller', 'mascarpone', 'tomme de savoie',
+    'string cheese', 'saint marcellin', 'american cheese', 'pont l'eveque', 'mahon', 'cantal',
+    'emmental francais', 'selles sur cher', 'neufchatel', 'morbier', 'fourme de montbrison', 'caprice des dieux',
+    'reblochon', 'coulommiers', 'taleggio', 'vacherin', 'beaufort', 'beaufort alpage', 'abondance',
+    'saint paulin', 'chaource', 'livarot', 'rocamadour', 'cambozola', 'oregon blue vein', 'leonora goat cheese',
+    'pimento cheese', 'banon', 'cabrales', 'tete de moine', 'boerenkaas', 'brocciu', 'laguiole', 'limburger',
+    'queso de bola', 'maroilles', 'stichelton', 'ossau iraty', 'saint nectaire', 'crottin de chavignol',
+    'mimolette', 'pelardon', 'fourme dambert', 'fromage frais', 'bleu du vercors sassenage', 'cabecou',
+    'saint felicien', 'bleu d'auvergne', 'bleu de bresse', 'farmer cheese', 'hooligan', 'bleu des causses',
+    'cotija', 'burrata', 'oaxaca', 'fontina', 'asiago', 'chihuahua', 'raclette', 'romano', 'jarlsberg',
+    'mizithra', 'panela', 'provel', 'asadero', 'dubliner', 'fontinella', 'kasseri', 'paneer', 'bocconcini'
+  ],
+  'Coffee': [
+    'coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'americano', 'mocha', 'macchiato', 'cortado',
+    'flat white', 'cold brew', 'iced coffee', 'frappuccino', 'starbucks', 'barista', 'brew', 'roast',
+    'tea', 'chai', 'matcha', 'green tea', 'black tea', 'herbal tea', 'boba', 'bubble tea'
+  ],
+  'Beverages': [
+    'drink', 'beverage', 'cocktail', 'beer', 'wine', 'whiskey', 'vodka', 'gin', 'rum', 'tequila',
+    'margarita', 'mojito', 'martini', 'bar', 'pub', 'brewery', 'winery', 'spirits', 'alcohol',
+    'juice', 'smoothie', 'shake', 'soda', 'water', 'sparkling', 'ale', 'lager', 'cider', 'champagne',
+    'prosecco', 'old fashioned', 'negroni', 'daiquiri', 'manhattan', 'cosmopolitan', 'bloody mary',
+    'pina colada', 'mai tai', 'zombie', 'espresso martini', 'irish coffee', 'white russian', 'black russian',
+    'screwdriver', 'vodka tonic', 'gin and tonic', 'whiskey sour', 'rum and coke', 'tequila sunrise',
+    'blue lagoon', 'sex on the beach', 'long island iced tea', 'appletini', 'lemon drop'
+  ],
+  'Dates': [
+    'date', 'dating', 'went out', 'met up', 'tinder', 'bumble', 'hinge', 'match', 'romance', 'romantic',
+    'boyfriend', 'girlfriend', 'partner', 'seeing someone', 'relationship', 'first date', 'second date',
+    'coffee date', 'dinner date', 'dating app', 'setup', 'blind date', 'speed dating', 'anniversary',
+    'valentine', 'proposal', 'engagement', 'wedding', 'spouse', 'movie night', 'picnic', 'beach walk',
+    'hike', 'museum visit', 'concert', 'wine tasting', 'cooking class', 'stargazing', 'amusement park',
+    'spa day', 'rooftop bar', 'art gallery', 'bike ride', 'kayaking', 'pottery class', 'bookstore browse',
+    'farmers market', 'sunset cruise', 'dance lesson', 'escape room', 'hot air balloon', 'couples massage'
+  ],
       'People': [
         'person', 'friend', 'met', 'someone', 'colleague', 'coworker', 'boss', 'manager', 'team', 'neighbor',
         'acquaintance', 'stranger', 'conversation', 'chat', 'talked', 'spoke', 'networking', 'social',
