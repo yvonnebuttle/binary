@@ -115,9 +115,12 @@ async function detectCategory(inputText, userLat, userLng) {
   // --------------------
   try {
     const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8';
-    if (tmdbKey !== '559458ec6b7148bf5d8a39f7224a2fb8') {
-      const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
-      const movieData = await movieRes.json();
+   if (tmdbKey) {  // only run if key is set
+  try {
+    const movieRes = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`
+    );
+    const movieData = await movieRes.json();
       if (movieData.results && movieData.results.length > 0) {
         const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
         confidence.Movies = exact ? 0.9 : 0.6;
@@ -186,7 +189,7 @@ async function detectCategory(inputText, userLat, userLng) {
   categoryCache[text] = result;
   saveCache();
 
-  return result;
+  return result;}
 
 // === Main App ===
 function BinaryApp() {
