@@ -51,11 +51,11 @@ async function detectPlaceCategory(text) {
 
         detailsService.getDetails({ placeId: first.place_id, fields: ['types'] }, (place, detailsStatus) => {
           if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
-            if (place.types.includes('cafe') || place.types.includes('coffee_shop')) resolve('Coffee / Café Visit');
-            else if (place.types.includes('restaurant')) resolve('Restaurant / Food Experience');
-            else if (place.types.includes('bar')) resolve('Restaurant / Food Experience');
+            if (place.types.includes('cafe') || place.types.includes('coffee_shop')) resolve('Coffee');
+            else if (place.types.includes('restaurant')) resolve('Food');
+            else if (place.types.includes('bar')) resolve('Beverages');
             else if (place.types.includes('park') || place.types.includes('museum') || place.types.includes('tourist_attraction'))
-              resolve('Travel / Place Visit');
+              resolve('Places');
             else resolve('Other');
           } else {
             resolve(null);
