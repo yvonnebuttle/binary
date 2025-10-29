@@ -1,0 +1,385 @@
+import React, { useState, useEffect } from 'react';
+import { ThumbsUp, ThumbsDown, Mic, List, Plus, Trash2, Filter, MessageSquare, X } from 'lucide-react';
+
+export default function LifeRatingTracker() {
+  const [items, setItems] = useState([]);
+  const [inputText, setInputText] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isLoading, setIsLoading] = useState(true);
+  const [editingComment, setEditingComment] = useState(null);
+  const [commentText, setCommentText] = useState('');
+
+  useEffect(() => {
+    loadItems();
+  }, []);
+
+  const loadItems = async () => {
+    try {
+      const keys = await window.storage.list('item:');
+      if (keys && keys.keys) {
+        const loadedItems = [];
+        for (const key of keys.keys) {
+          try {
+            const result = await window.storage.get(key);
+            if (result) {
+              loadedItems.push(JSON.parse(result.value));
+            }
+          } catch (e) {
+            console.log('Key not found:', key);
+          }
+        }
+        setItems(loadedItems.sort((a, b) => b.timestamp - a.timestamp));
+      }
+    } catch (error) {
+      console.error('Error loading items:', error);
+    }
+    setIsLoading(false);
+  };
+
+  const detectCategory = (text) => {
+    const lower = text.toLowerCase();
+    
+    // More comprehensive categories with extensive keywords
+    const categories = {
+      'Food & Dining': [
+        'restaurant', 'meal', 'dinner', 'lunch', 'breakfast', 'brunch', 'food', 'dish', 'ate', 'eating',
+        'pizza', 'burger', 'sushi', 'pasta', 'salad', 'sandwich', 'soup', 'steak', 'chicken', 'fish',
+        'seafood', 'vegetarian', 'vegan', 'dessert', 'ice cream', 'bakery', 'deli', 'takeout', 'delivery',
+        'menu', 'ordered', 'chef', 'cuisine', 'thai', 'indian', 'chinese', 'japanese', 'mexican', 'italian',
+        'french', 'Mediterranean', 'bbq', 'grill', 'buffet', 'bistro', 'diner', 'eatery', 'tasted', 'flavor'
+      ],
+      'Cheese & Dairy': [
+        'cheese', 'brie', 'cheddar', 'gouda', 'mozzarella', 'parmesan', 'feta', 'blue cheese', 'camembert',
+        'gruyere', 'swiss', 'provolone', 'ricotta', 'manchego', 'aged', 'sharp', 'mild', 'soft cheese',
+        'hard cheese', 'cream cheese', 'goat cheese', 'dairy', 'yogurt', 'milk', 'butter'
+      ],
+      'Coffee & Tea': [
+        'coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'americano', 'mocha', 'macchiato', 'cortado',
+        'flat white', 'cold brew', 'iced coffee', 'frappuccino', 'starbucks', 'barista', 'brew', 'roast',
+        'tea', 'chai', 'matcha', 'green tea', 'black tea', 'herbal tea', 'boba', 'bubble tea'
+      ],
+      'Drinks & Beverages': [
+        'drink', 'beverage', 'cocktail', 'beer', 'wine', 'whiskey', 'vodka', 'gin', 'rum', 'tequila',
+        'margarita', 'mojito', 'martini', 'bar', 'pub', 'brewery', 'winery', 'spirits', 'alcohol',
+        'juice', 'smoothie', 'shake', 'soda', 'water', 'sparkling'
+      ],
+      'Dating & Romance': [
+        'date', 'dating', 'went out', 'met up', 'tinder', 'bumble', 'hinge', 'match', 'romance', 'romantic',
+        'boyfriend', 'girlfriend', 'partner', 'seeing someone', 'relationship', 'first date', 'second date',
+        'coffee date', 'dinner date', 'dating app', 'setup', 'blind date', 'speed dating'
+      ],
+      'People & Social': [
+        'person', 'friend', 'met', 'someone', 'colleague', 'coworker', 'boss', 'manager', 'team', 'neighbor',
+        'acquaintance', 'stranger', 'conversation', 'chat', 'talked', 'spoke', 'networking', 'social',
+        'party', 'gathering', 'meetup', 'hangout', 'catch up', 'reunion'
+      ],
+      'Sports & Fitness': [
+        'tennis', 'game', 'played', 'match', 'workout', 'exercise', 'gym', 'fitness', 'training', 'run',
+        'running', 'jogging', 'cycling', 'swimming', 'yoga', 'pilates', 'crossfit', 'weights', 'cardio',
+        'basketball', 'soccer', 'football', 'baseball', 'golf', 'volleyball', 'badminton', 'squash',
+        'hiking', 'climbing', 'boxing', 'martial arts', 'spin class', 'zumba', 'dance class'
+      ],
+      'Entertainment': [
+        'movie', 'film', 'cinema', 'show', 'series', 'episode', 'season', 'netflix', 'hbo', 'streaming',
+        'book', 'read', 'novel', 'author', 'podcast', 'music', 'song', 'album', 'concert', 'gig',
+        'performance', 'theater', 'play', 'musical', 'comedy show', 'standup', 'museum', 'gallery',
+        'exhibition', 'watched', 'listened', 'binge', 'documentary', 'anime', 'manga'
+      ],
+      'Shopping & Products': [
+        'bought', 'purchased', 'shopping', 'store', 'shop', 'mall', 'online', 'amazon', 'product',
+        'brand', 'clothes', 'clothing', 'shoes', 'sneakers', 'fashion', 'accessories', 'gadget',
+        'tech', 'phone', 'laptop', 'computer', 'electronics', 'furniture', 'decor', 'appliance'
+      ],
+      'Travel & Places': [
+        'visited', 'trip', 'travel', 'vacation', 'holiday', 'location', 'destination', 'city', 'country',
+        'hotel', 'hostel', 'airbnb', 'resort', 'beach', 'mountain', 'park', 'attraction', 'tourist',
+        'sightseeing', 'flight', 'airport', 'train', 'road trip', 'adventure', 'explore', 'wanderlust'
+      ],
+      'Work & Career': [
+        'work', 'job', 'career', 'office', 'meeting', 'presentation', 'project', 'deadline', 'client',
+        'interview', 'promotion', 'raise', 'salary', 'boss', 'colleague', 'professional', 'business',
+        'conference', 'workshop', 'training', 'corporate', 'startup', 'company'
+      ],
+      'Health & Wellness': [
+        'doctor', 'dentist', 'appointment', 'checkup', 'therapy', 'therapist', 'medication', 'medicine',
+        'health', 'wellness', 'medical', 'hospital', 'clinic', 'treatment', 'massage', 'spa', 'relaxation',
+        'meditation', 'mindfulness', 'sleep', 'rest', 'recovery'
+      ],
+      'Hobbies & Crafts': [
+        'hobby', 'craft', 'diy', 'project', 'painting', 'drawing', 'art', 'photography', 'photo',
+        'knitting', 'sewing', 'cooking', 'baking', 'recipe', 'gardening', 'plants', 'collecting',
+        'gaming', 'video game', 'board game', 'puzzle', 'lego', 'model', 'creative'
+      ]
+    };
+
+    // Check each category and return the first match
+    for (const [category, keywords] of Object.entries(categories)) {
+      if (keywords.some(keyword => lower.includes(keyword))) {
+        return category;
+      }
+    }
+    
+    return 'Other';
+  };
+
+  const addItem = async (rating) => {
+    if (!inputText.trim()) return;
+
+    const newItem = {
+      id: Date.now().toString(),
+      text: inputText.trim(),
+      rating: rating,
+      category: detectCategory(inputText),
+      timestamp: Date.now(),
+      date: new Date().toLocaleDateString()
+    };
+
+    try {
+      await window.storage.set(`item:${newItem.id}`, JSON.stringify(newItem));
+      setItems(prev => [newItem, ...prev]);
+      setInputText('');
+    } catch (error) {
+      console.error('Error saving item:', error);
+      alert('Failed to save item. Please try again.');
+    }
+  };
+
+  const deleteItem = async (id) => {
+    try {
+      await window.storage.delete(`item:${id}`);
+      setItems(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting item:', error);
+    }
+  };
+
+  const startEditingComment = (item) => {
+    setEditingComment(item.id);
+    setCommentText(item.comment || '');
+  };
+
+  const saveComment = async (id) => {
+    try {
+      const item = items.find(i => i.id === id);
+      const updatedItem = { ...item, comment: commentText.trim() };
+      await window.storage.set(`item:${id}`, JSON.stringify(updatedItem));
+      setItems(prev => prev.map(i => i.id === id ? updatedItem : i));
+      setEditingComment(null);
+      setCommentText('');
+    } catch (error) {
+      console.error('Error saving comment:', error);
+      alert('Failed to save comment. Please try again.');
+    }
+  };
+
+  const cancelEditingComment = () => {
+    setEditingComment(null);
+    setCommentText('');
+  };
+
+  const categories = ['All', ...new Set(items.map(item => item.category))].sort();
+  
+  const filteredItems = selectedCategory === 'All' 
+    ? items 
+    : items.filter(item => item.category === selectedCategory);
+
+  const getRatingEmoji = (rating) => {
+    return rating === 'like' ? '👍' : '👎';
+  };
+
+  const getRatingColor = (rating) => {
+    return rating === 'like' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Binary</h1>
+          <p className="text-gray-600">Yes/no, that's all</p>
+        </div>
+
+        {/* Input Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="What did you experience? (e.g., 'Tried aged cheddar')"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none"
+                onKeyPress={(e) => e.key === 'Enter' && inputText.trim() && document.getElementById('like-btn').focus()}
+              />
+              <Mic className="absolute right-3 top-3.5 text-gray-400 w-5 h-5" />
+            </div>
+          </div>
+          
+          <div className="text-xs text-gray-500 mb-3 text-center">
+            Tap the microphone icon on your keyboard to use voice input
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              id="like-btn"
+              onClick={() => addItem('like')}
+              disabled={!inputText.trim()}
+              className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
+            >
+              <ThumbsUp className="w-5 h-5" />
+              Like
+            </button>
+            <button
+              onClick={() => addItem('dislike')}
+              disabled={!inputText.trim()}
+              className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
+            >
+              <ThumbsDown className="w-5 h-5" />
+              Dislike
+            </button>
+          </div>
+        </div>
+
+        {/* Category Filter */}
+        {items.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="w-4 h-4 text-gray-600" />
+              <span className="font-semibold text-gray-700">Filter by category:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    selectedCategory === cat
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Items List */}
+        <div className="space-y-3">
+          {filteredItems.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+              <List className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">
+                {items.length === 0 
+                  ? "No ratings yet. Start by rating your first experience!"
+                  : "No items in this category yet."}
+              </p>
+            </div>
+          ) : (
+            filteredItems.map(item => (
+              <div
+                key={item.id}
+                className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
+                        {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'}
+                      </span>
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                        {item.category}
+                      </span>
+                    </div>
+                    <p className="text-gray-800 font-medium mb-1">{item.text}</p>
+                    <p className="text-sm text-gray-500">{item.date}</p>
+                    
+                    {/* Comment Section */}
+                    {editingComment === item.id ? (
+                      <div className="mt-3 space-y-2">
+                        <textarea
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          placeholder="Add your thoughts..."
+                          className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none"
+                          rows="3"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => saveComment(item.id)}
+                            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEditingComment}
+                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {item.comment && (
+                          <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                            <p className="text-sm text-gray-700 italic">{item.comment}</p>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => startEditingComment(item)}
+                          className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          {item.comment ? 'Edit comment' : 'Add comment'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => deleteItem(item.id)}
+                    className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Stats */}
+        {items.length > 0 && (
+          <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
+            <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 bg-green-50 rounded-xl">
+                <div className="text-3xl font-bold text-green-600">
+                  {items.filter(i => i.rating === 'like').length}
+                </div>
+                <div className="text-sm text-gray-600">Liked</div>
+              </div>
+              <div className="text-center p-4 bg-red-50 rounded-xl">
+                <div className="text-3xl font-bold text-red-600">
+                  {items.filter(i => i.rating === 'dislike').length}
+                </div>
+                <div className="text-sm text-gray-600">Disliked</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
