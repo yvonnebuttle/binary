@@ -38,76 +38,102 @@ const ALL_CATEGORIES = [
 ];
 
 // === Smart category detection ===
-async function detectCategory(text, userLat, userLng) {
+async function detectCategory(inputText, userLat, userLng) {
+  const text = inputText.trim();
   const lower = text.toLowerCase();
+  const isCapitalised = /^[A-Z]/.test(text);
+  const confidence = { Books: 0, Movies: 0, Places: 0, Food: 0, Other: 0 };
+  let placeDistance = null;
+  let isFoodPlaceNearby = false;
+  let isGenericPlaceNearby = false;
 
-  // --- Generic keyword fallback ---
-  const keywords = {
-    'Food': ['restaurant','meal','dinner','lunch','breakfast','food','dish','ate','eating','ramen','blueberries'],
-    'Cheese': ['cheese','brie','cheddar','gouda','mozzarella','parmesan'],
-    'Coffee': ['coffee','cafe','espresso','latte','cappuccino','americano'],
-    'Places': ['visited','trip','travel','vacation','holiday','beach','town','city','park','museum','bar','club','venue'],
-    'Dates': ['date','dating','went out','met up'],
-    'People': ['person','friend','met','someone','colleague'],
-    'Sports': ['tennis','game','played','match','workout','exercise','gym'],
-    'Entertainment': ['movie','show','series','book','music','concert','watched','read'],
-  };
-
-  for (const [cat, words] of Object.entries(keywords)) {
-    if (words.some(w => lower.includes(w))) return cat;
+  // ---- 1️⃣ Google Books ----
+  try {
+    const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}&maxResults=3`);
+    const bookData = await bookRes.json();
+    if (bookData.items && bookData.items.length > 0) {
+      const exact = bookData.items.find(b =>
+        b.volumeInfo.title.toLowerCase() === lower
+      );
+      confidence.Books = exact ? 0.9 : 0.6;
+      if (isCapitalised) confidence.Books += 0.2;
+    }
+  } catch (err) {
+    console.warn("Books API failed:", err);
   }
 
-  // --- Google Places detection ---
-  if (window.google && window.google.maps) {
-    try {
-      const placeCat = await new Promise(resolve => {
-        const service = new google.maps.places.AutocompleteService();
-        service.getPlacePredictions(
-          { input: text, types: ['establishment'] },
-          (predictions, status) => {
-            if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length) return resolve(null);
-            const first = predictions[0];
-            const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
-            detailsService.getDetails({ placeId: first.place_id, fields: ['types', 'geometry'] }, (place, detailsStatus) => {
-              if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
-                let nearbyBoost = 0;
-                if (userLat && userLng && place.geometry?.location) {
-                  const dLat = place.geometry.location.lat() - userLat;
-                  const dLng = place.geometry.location.lng() - userLng;
-                  const dist = Math.sqrt(dLat*dLat + dLng*dLng);
-                  if (dist < 0.02) nearbyBoost = 1;
-                }
-
-                if (place.types.includes('cafe')) resolve('Coffee');
-                else if (place.types.includes('restaurant')) resolve('Food');
-                else if (place.types.includes('bar')) resolve('Beverages');
-                else if (place.types.some(t => ['park','museum','tourist_attraction'].includes(t))) resolve('Places');
-                else resolve(null);
-              } else resolve(null);
-            });
-          }
-        );
-      });
-      if (placeCat) return placeCat;
-    } catch(err) { console.warn('Places detection failed', err); }
+  // ---- 2️⃣ TMDB Movies ----
+  try {
+    const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=YOUR_TMDB_KEY&query=${encodeURIComponent(text)}`);
+    const movieData = await movieRes.json();
+    if (movieData.results && movieData.results.length > 0) {
+      const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
+      confidence.Movies = exact ? 0.9 : 0.6;
+      if (isCapitalised) confidence.Movies += 0.2;
+    }
+  } catch (err) {
+    console.warn("Movies API failed:", err);
   }
 
-  // --- Google Books API ---
+  // ---- 3️⃣ Google Places ----
   try {
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}`);
-    const data = await res.json();
-    if (data.totalItems > 0) return 'Books';
-  } catch(err){ console.warn('Books detection failed', err); }
+    const mapsRes = await fetch(
+      `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(text)}&inputtype=textquery&fields=name,geometry,types&locationbias=point:${userLat},${userLng}&key=YOUR_GOOGLE_PLACES_KEY`
+    );
+    const mapsData = await mapsRes.json();
+    if (mapsData.candidates && mapsData.candidates.length > 0) {
+      const place = mapsData.candidates[0];
+      const types = place.types || [];
+      let score = 0.5; // default confidence for generic place
+      if (types.some(t => ["restaurant", "bar", "cafe"].includes(t))) {
+        score = 0.8;
+        isFoodPlaceNearby = true;
+      } else if (types.some(t => ["point_of_interest", "establishment"].includes(t))) {
+        score = 0.6;
+        isGenericPlaceNearby = true;
+      }
+      if (place.geometry && place.geometry.location && userLat && userLng) {
+        placeDistance = distanceKm(userLat, userLng, place.geometry.location.lat, place.geometry.location.lng);
+        if (placeDistance < 5) score += 0.2; // proximity boost
+      }
+      confidence.Places = score;
+    }
+  } catch (err) {
+    console.warn("Places API failed:", err);
+  }
 
-  // --- TMDB Movies API ---
-  const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8'; // <-- insert your TMDB key
-  try {
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
-    const data = await res.json();
-    if (data.results && data.results.length > 0) return 'Movies';
-  } catch(err){ console.warn('Movies detection failed', err); }
+  // ---- 4️⃣ Keyword fallback for Food ----
+  const foodKeywords = ["restaurant", "cheese", "ramen", "blueberry", "coffee", "pizza", "bread", "fruit", "food", "snack"];
+  if (foodKeywords.some(k => lower.includes(k))) confidence.Food = 0.6;
 
-  return 'Other';
+  // ---- 5️⃣ Proximity Overrides ----
+  // If near food or place, boost them above Books/Movies
+  if (placeDistance !== null && placeDistance < 5) {
+    if (isFoodPlaceNearby) confidence.Food = Math.max(confidence.Food, 0.9);
+    if (isGenericPlaceNearby) confidence.Places = Math.max(confidence.Places, 0.9);
+    // dampen Books/Movies if a nearby place exists
+    confidence.Books = Math.min(confidence.Books, 0.5);
+    confidence.Movies = Math.min(confidence.Movies, 0.5);
+  }
+
+  // ---- 6️⃣ Final Decision ----
+  const sorted = Object.entries(confidence).sort((a, b) => b[1] - a[1]);
+  let [bestCat, bestScore] = sorted[0];
+  if (bestScore < 0.4) bestCat = "Other";
+
+  return { category: bestCat, confidence: bestScore.toFixed(2), confidenceMap: confidence, distance: placeDistance };
+}
+
+// Helper for proximity boost
+function distanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // === Main App ===
