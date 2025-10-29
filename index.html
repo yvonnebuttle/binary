@@ -250,7 +250,11 @@ async function detectMovieTitle(text) {
       alert('Failed to add item. Try again.');
     }
   };
-
+  // --- Update category manually ---
+  const updateCategory = (id, newCat) => {
+    const newItems = items.map(item => item.id === id ? {...item, category: newCat} : item);
+    setItems(newItems);
+    saveItems(newItems);
           const deleteItem = (id) => {
             const newItems = items.filter(item => item.id !== id);
             setItems(newItems);
