@@ -154,7 +154,7 @@ async function detectCategory(inputText, userLat, userLng) {
                   const typeMap = { cafe:'Coffee', bar:'Beverages', pub:'Beverages', restaurant:'Food' };
                   let baseCat = null;
                   for (let t of place.types) if (typeMap[t]) { baseCat = typeMap[t]; break; }
-                  if (!baseCat && place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','establishment'].includes(t)))
+                  if (!baseCat && place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','locality','sublocality','administrative_area_level_1','establishment'].includes(t)))
                     baseCat = 'Places';
 
                   if (baseCat) confidence[baseCat] = Math.max(confidence[baseCat], 0.6 + nearbyBoost);
