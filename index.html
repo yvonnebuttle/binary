@@ -114,6 +114,15 @@ function BinaryApp() {
     const stored = localStorage.getItem('binaryItems');
     if (stored) setItems(JSON.parse(stored));
   }, []);
+    useEffect(() => {
+  (async () => {
+    if (!window.llm) {
+      window.llm = await LlamaJS.init({
+        modelUrl: "https://huggingface.co/declare-labs/llama-2-7b-chat/resolve/main/ggml-model-q4_0.bin"
+      });
+    }
+  })();
+}, []);
 
   const saveItems = (newItems) => {
     setItems(newItems);
@@ -220,7 +229,6 @@ function BinaryApp() {
         <div className="space-y-3">
           {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-              <div className="flex justify-center mb-4"><List /></div>
               <p className="text-gray-500">{items.length === 0 ? "No ratings yet." : "No items in this category yet."}</p>
             </div>
           ) : (
