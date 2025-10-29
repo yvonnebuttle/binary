@@ -104,9 +104,9 @@ async function detectCategory(inputText, userLat, userLng) {
     const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}&maxResults=3`);
     const bookData = await bookRes.json();
     if (bookData.items?.length) {
-      const exact = bookData.items.find(b => b.volumeInfo.title.toLowerCase() === lower);
-      confidence.Books = exact ? 0.9 : 0.6;
-      if (isCapitalised) confidence.Books += 0.2;
+      const match = bookData.items.find(b => b.volumeInfo.title.toLowerCase().includes(lower));
+      confidence.Books = match ? 0.9 : 0.6;
+      if (isCapitalised) confidence.Books += 0.1;
     }
   } catch(err){ console.warn("Books API failed:", err); }
 
@@ -121,15 +121,15 @@ async function detectCategory(inputText, userLat, userLng) {
       );
       const movieData = await movieRes.json();
       if (movieData.results?.length) {
-        const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
-        confidence.Movies = exact ? 0.9 : 0.6;
-        if (isCapitalised) confidence.Movies += 0.2;
+        const match = movieData.results.find(m => m.title.toLowerCase().includes(lower));
+        confidence.Movies = match ? 0.9 : 0.6;
+        if (isCapitalised) confidence.Movies += 0.1;
       }
     }
   } catch(err){ console.warn("Movies API failed:", err); }
 
   // --------------------
-  // 3️⃣ Google Places API (weighted top 5)
+  // 3️⃣ Google Places API (top 5 predictions)
   // --------------------
   try {
     await waitForGoogleMaps();
@@ -146,13 +146,11 @@ async function detectCategory(inputText, userLat, userLng) {
         const typeScores = {}; 
         const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
 
-        // Fetch details for top 5 predictions
         await Promise.all(predictions.map(p => new Promise(res => {
           detailsService.getDetails({ placeId: p.place_id, fields: ['types','geometry'] }, place => {
             if (place?.types?.length) {
               for (let t of place.types) typeScores[t] = (typeScores[t] || 0) + 1;
 
-              // Proximity boost
               if (userLat && userLng && place.geometry?.location) {
                 const dist = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
                 if (dist < 5) typeScores['_proximity'] = (typeScores['_proximity'] || 0) + 1;
@@ -162,8 +160,19 @@ async function detectCategory(inputText, userLat, userLng) {
           });
         })));
 
-        // Map types to categories and compute confidence
-        const typeMap = { cafe:'Coffee', bar:'Beverages', pub:'Beverages', restaurant:'Food', park:'Places', museum:'Places', tourist_attraction:'Places', point_of_interest:'Places' };
+        const typeMap = {
+          cafe: 'Coffee',
+          bar: 'Beverages',
+          pub: 'Beverages',
+          restaurant: 'Food',
+          park: 'Places',
+          museum: 'Places',
+          tourist_attraction: 'Places',
+          point_of_interest: 'Places',
+          city: 'Places',
+          establishment: 'Other'
+        };
+
         for (let [type, count] of Object.entries(typeScores)) {
           if (type === '_proximity') continue;
           const baseCat = typeMap[type] || null;
@@ -178,11 +187,15 @@ async function detectCategory(inputText, userLat, userLng) {
   } catch(err){ console.warn("Places detection failed:", err); }
 
   // --------------------
-  // 4️⃣ Keyword fallback
+  // 4️⃣ Keyword fallback (only if nothing else is confident)
   // --------------------
-  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some(k => lower.includes(k))) {
-      confidence[cat] = Math.max(confidence[cat], 0.5);
+  const maxConfidence = Math.max(...Object.values(confidence));
+  if (maxConfidence < 0.4) {
+    for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+      if (keywords.some(k => lower.includes(k))) {
+        confidence[cat] = 0.5;
+        break; // only assign one fallback
+      }
     }
   }
 
@@ -191,11 +204,10 @@ async function detectCategory(inputText, userLat, userLng) {
   // --------------------
   const sorted = Object.entries(confidence).sort((a,b) => b[1]-a[1]);
   let [bestCat, bestScore] = sorted[0];
-  if (bestScore < 0.4) bestCat = 'Other';
+  if (bestScore < 0.3) bestCat = 'Other';
 
   const result = { category: bestCat, confidence: bestScore.toFixed(2), confidenceMap: confidence };
 
-  // Save to cache & localStorage
   categoryCache[text] = result;
   saveCache();
 
