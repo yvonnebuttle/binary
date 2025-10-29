@@ -121,19 +121,18 @@ async function detectPlaceCategory(text) {
             return 'Other';
           };
 
-          const addItem = async (rating) => {
+         const addItem = async (rating) => {
   if (!inputText.trim()) return;
 
   try {
-    // ✅ Loading fallback: only call Google Places if API is loaded
     let category = null;
     if (window.google && window.google.maps) {
       category = await detectPlaceCategory(inputText);
     }
 
-    // Fallback to keyword-based detection if Google Places is not ready
-if (!category || category === 'Other') {
-  category = detectCategory(inputText);
+    if (!category || category === 'Other') {
+      category = detectCategory(inputText);
+    }
 
     const newItem = {
       id: Date.now().toString(),
