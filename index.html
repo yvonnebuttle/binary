@@ -53,6 +53,119 @@ const CATEGORY_KEYWORDS = {
 async function detectCategory(inputText, userLat, userLng) { const text = inputText.trim(); if (!text) return 'Other'; const lower = text.toLowerCase(); if (categoryCache[text]) return categoryCache[text]; try { await waitForGoogleMaps(); if (window.google?.maps && userLat && userLng) { const service = new google.maps.places.AutocompleteService(); const request = { input: text }; if (userLat && userLng) { request.location = new google.maps.LatLng(userLat, userLng); request.radius = 20000; } const predictions = await new Promise(resolve => { service.getPlacePredictions(request, (preds, status) => { resolve(status === google.maps.places.PlacesServiceStatus.OK ? preds?.slice(0, 5) : []); }); }); if (predictions?.length) { const detailsService = new google.maps.places.PlacesService(document.createElement('div')); const placeResults = await Promise.allSettled(predictions.map(p => new Promise(res => { detailsService.getDetails({ placeId: p.place_id, fields: ['types', 'geometry', 'name'] }, place => res(place)); }))); for (const result of placeResults) { if (result.status === 'rejected') continue; const place = result.value; if (!place?.types || !place.geometry?.location) continue; const distance = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng()); if (distance <= 2) { const typeMap = { cafe: 'Coffee', bar: 'Beverages', night_club: 'Beverages', restaurant: 'Food', meal_takeaway: 'Food', meal_delivery: 'Food', food: 'Food', bakery: 'Food', museum: 'Places', park: 'Places', tourist_attraction: 'Places', point_of_interest: 'Places', establishment: 'Places' }; for (const type of place.types) { if (typeMap[type]) { const category = typeMap[type]; categoryCache[text] = category; saveCache(); console.log(`✅ Matched via Google Maps (<2km): "${text}" → ${category} (${distance.toFixed(2)}km)`); return category; } } } } } } } catch(err){ console.warn("Google Maps detection failed:", err); } for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) { if (config.exact?.some(k => lower.includes(k))) { categoryCache[text] = category; saveCache(); console.log(`✅ Matched via keywords: "${text}" → ${category}`); return category; } if (config.partial?.some(k => lower.includes(k))) { categoryCache[text] = category; saveCache(); console.log(`✅ Matched via partial keywords: "${text}" → ${category}`); return category; } } categoryCache[text] = 'Other'; saveCache(); console.log(`ℹ️ No match found: "${text}" → Other`); return 'Other'; }
 // App (unchanged)
 function BinaryApp() { const [items, setItems] = React.useState([]); const [inputText, setInputText] = React.useState(''); const [selectedCategory, setSelectedCategory] = React.useState('All'); const [isLoading, setIsLoading] = React.useState(true); const [editingComment, setEditingComment] = React.useState(null); const [commentText, setCommentText] = React.useState(''); const [isProcessing, setIsProcessing] = React.useState(false); React.useEffect(() => { const stored = localStorage.getItem('binaryItems'); if (stored) setItems(JSON.parse(stored)); setIsLoading(false); navigator.geolocation.getCurrentPosition(pos => { window.userLat = pos.coords.latitude; window.userLng = pos.coords.longitude; }, err => console.warn('Location denied:', err)); }, []); const saveItems = (newItems) => { setItems(newItems); localStorage.setItem('binaryItems', JSON.stringify(newItems)); }; const addItem = async (rating) => { if (!inputText.trim() || isProcessing) return; setIsProcessing(true); try { const category = await detectCategory(inputText, window.userLat, window.userLng); const newItem = { id: Date.now().toString(), text: inputText.trim(), rating, category, timestamp: Date.now(), date: new Date().toLocaleDateString(), }; saveItems([newItem, ...items]); setInputText(''); } catch (err) { console.error('Failed to add item:', err); } finally { setIsProcessing(false); } }; const updateCategory = (id, newCat) => { saveItems(items.map(item => item.id === id ? { ...item, category: newCat } : item)); }; const deleteItem = (id) => saveItems(items.filter(item => item.id !== id)); const startEditingComment = (item) => { setEditingComment(item.id); setCommentText(item.comment || ''); }; const saveComment = (id) => { saveItems(items.map(i => i.id === id ? { ...i, comment: commentText.trim() } : i)); setEditingComment(null); setCommentText(''); }; const cancelEditingComment = () => { setEditingComment(null); setCommentText(''); }; const categories = ['All', ...ALL_CATEGORIES]; const filteredItems = selectedCategory === 'All' ? items : items.filter(i => i.category === selectedCategory); const getRatingEmoji = (rating) => rating === 'like' ? '👍' : '👎'; const getRatingColor = (rating) => rating === 'like' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300'; if (isLoading) return <div className="min-h-screen flex items-center justify-center text-gray-600">Loading...</div>; return ( <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6"> <div className="max-w-2xl mx-auto px-4 py-6"> <div className="text-center mb-6"> <h1 className="text-3xl font-bold text-gray-800 mb-2">Binary</h1> <p className="text-gray-600">Yes/no, that's all</p> </div> <div className="bg-white rounded-2xl shadow-lg p-6 mb-6"> <div className="flex items-center gap-2 mb-4"> <div className="relative flex-1"> <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="What did you experience?" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none" onKeyPress={(e) => { if (e.key === 'Enter' && inputText.trim() && !isProcessing) { addItem('like'); } }} disabled={isProcessing} /> </div> </div> <div className="text-xs text-gray-500 mb-3 text-center"> Tap the microphone icon on your keyboard to use voice input </div> <div className="flex gap-3"> <button id="like-btn" onClick={() => addItem('like')} disabled={!inputText.trim() || isProcessing} className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"> <ThumbsUp /> {isProcessing ? 'Processing...' : 'Like'} </button> <button onClick={() => addItem('dislike')} disabled={!inputText.trim() || isProcessing} className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"> <ThumbsDown /> {isProcessing ? 'Processing...' : 'Dislike'} </button> </div> </div> {items.length > 0 && ( <div className="bg-white rounded-2xl shadow-lg p-4 mb-6"> <div className="flex items-center gap-2 mb-3"><Filter /><span className="font-semibold text-gray-700">Filter by category:</span></div> <div className="flex flex-wrap gap-2"> {categories.map(cat => ( <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === cat ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{cat}</button> ))} </div> </div> )} <div className="space-y-3"> {filteredItems.length === 0 ? ( <div className="bg-white rounded-2xl shadow-lg p-12 text-center"> <div className="flex justify-center mb-4"><List /></div> <p className="text-gray-500">{items.length === 0 ? "No ratings yet." : "No items in this category yet."}</p> </div> ) : ( filteredItems.map(item => ( <div key={item.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow"> <div className="flex items-start justify-between"> <div className="flex-1"> <div className="flex items-center gap-2 mb-1"> <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}> {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'} </span> <select value={item.category} onChange={(e) => updateCategory(item.id, e.target.value)} className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700"> {ALL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)} </select> </div> <p className="text-gray-800 font-medium mb-1">{item.text}</p> <p className="text-sm text-gray-500">{item.date}</p> {editingComment === item.id ? ( <div className="mt-3 space-y-2"> <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Add your thoughts..." className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none" rows="3" autoFocus /> <div className="flex gap-2"> <button onClick={() => saveComment(item.id)} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors">Save</button> <button onClick={cancelEditingComment} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">Cancel</button> </div> </div> ) : ( <> {item.comment && ( <div className="mt-2 p-3 bg-gray-50 rounded-lg"> <p className="text-sm text-gray-700 italic">{item.comment}</p> </div> )} <button onClick={() => startEditingComment(item)} className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"> <MessageSquare /> {item.comment ? 'Edit comment' : 'Add comment'} </button> </> )} </div> <button onClick={() => deleteItem(item.id)} className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"> <Trash2 /> </button> </div> </div> )) )} </div> {items.length > 0 && ( <div className="mt-6 bg-white rounded-2xl shadow-lg p-6"> <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3> <div className="grid grid-cols-2 gap-4"> <div className="text-center p-4 bg-green-50 rounded-xl"> <div className="text-3xl font-bold text-green-600">{items.filter(i => i.rating === 'like').length}</div> <div className="text-sm text-gray-600">Liked</div> </div> <div className="text-center p-4 bg-red-50 rounded-xl"> <div className="text-3xl font-bold text-red-600">{items.filter(i => i.rating === 'dislike').length}</div> <div className="text-sm text-gray-600">Disliked</div> </div> </div> </div> )} </div> </div> ); } ReactDOM.render(<BinaryApp />, document.getElementById('root'));
+<div className="flex gap-3">
+  <button
+    id="like-btn"
+    onClick={() => addItem('like')}
+    disabled={isProcessing}
+    className="flex-1 flex items-center justify-center gap-2 bg-green-100 hover:bg-green-200 text-green-800 font-semibold py-3 rounded-xl transition disabled:opacity-50 border border-green-300"
+  >
+    <ThumbsUp /> Like
+  </button>
+  <button
+    id="dislike-btn"
+    onClick={() => addItem('dislike')}
+    disabled={isProcessing}
+    className="flex-1 flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-3 rounded-xl transition disabled:opacity-50 border border-red-300"
+  >
+    <ThumbsDown /> Dislike
+  </button>
+</div>
+</div>
+
+{/* Filter Bar */}
+<div className="flex justify-between items-center mb-4">
+  <div className="flex items-center gap-2">
+    <Filter />
+    <select
+      value={selectedCategory}
+      onChange={(e) => setSelectedCategory(e.target.value)}
+      className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 text-sm focus:outline-none"
+    >
+      {categories.map((cat) => (
+        <option key={cat} value={cat}>
+          {cat}
+        </option>
+      ))}
+    </select>
+  </div>
+  <div className="flex items-center gap-2 text-gray-500">
+    <List />
+    <span className="text-sm">{filteredItems.length} items</span>
+  </div>
+</div>
+
+{/* Item List */}
+<div className="space-y-3">
+  {filteredItems.map((item) => (
+    <div
+      key={item.id}
+      className={`p-4 rounded-xl border ${getRatingColor(item.rating)} flex justify-between items-start`}
+    >
+      <div className="flex-1">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-medium text-gray-800">{item.text}</div>
+          <div className="text-xs text-gray-500">{item.date}</div>
+        </div>
+        <div className="text-xs text-gray-500 mb-2">{item.category}</div>
+        {editingComment === item.id ? (
+          <div className="mt-2">
+            <textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:outline-none"
+              rows="2"
+              placeholder="Add a comment..."
+            />
+            <div className="flex gap-2 mt-1">
+              <button
+                onClick={() => saveComment(item.id)}
+                className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 font-medium"
+              >
+                Save
+              </button>
+              <button
+                onClick={cancelEditingComment}
+                className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-600 font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {item.comment ? (
+              <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg mb-1">{item.comment}</div>
+            ) : null}
+            <button
+              onClick={() => startEditingComment(item)}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              <MessageSquare /> {item.comment ? "Edit" : "Add"} comment
+            </button>
+          </div>
+        )}
+      </div>
+      <button
+        onClick={() => deleteItem(item.id)}
+        className="text-gray-400 hover:text-red-500 transition ml-3"
+      >
+        <Trash2 />
+      </button>
+    </div>
+  ))}
+
+  {filteredItems.length === 0 && (
+    <div className="text-center text-gray-400 text-sm py-6">No items yet</div>
+  )}
+</div>
+</div>
+</div>
+);
+}
+
+// Render the app
+ReactDOM.createRoot(document.getElementById('root')).render(<BinaryApp />);
 </script>
 </body>
 </html>
