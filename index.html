@@ -38,101 +38,139 @@ const ALL_CATEGORIES = [
 ];
 
 // === Smart category detection ===
+// In-memory cache for previously detected categories
+const categoryCache = {}; // text -> { category, confidence }
+
+const ALL_CATEGORIES = ['Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies', 'Things', 'Other'];
+
+// Keyword fallbacks for categories
+const CATEGORY_KEYWORDS = {
+  Food: ["restaurant","cheese","ramen","blueberry","pizza","bread","fruit","food","snack","dinner","lunch","breakfast","meal"],
+  Coffee: ["coffee","cafe","latte","espresso","cappuccino","americano"],
+  Beverages: ["bar","pub","cocktail","brewery","beer","wine"],
+  Places: ["museum","park","beach","city","town","venue","holiday","trip","vacation","tourist_attraction"],
+  Things: ["shoes","bike","sneakers","sponges","jacket","laptop","bag","phone","watch","bike","sneakers","runners"],
+};
+
+// Helper: compute distance in km between two lat/lng points
+function distanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat/2)**2 +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Main detection function
 async function detectCategory(inputText, userLat, userLng) {
   const text = inputText.trim();
   const lower = text.toLowerCase();
   const isCapitalised = /^[A-Z]/.test(text);
-  const confidence = { Books: 0, Movies: 0, Places: 0, Food: 0, Other: 0 };
-  let placeDistance = null;
-  let isFoodPlaceNearby = false;
-  let isGenericPlaceNearby = false;
 
-  // ---- 1️⃣ Google Books ----
+  // Check cache first
+  if (categoryCache[text]) return categoryCache[text];
+
+  // Initialize confidence for all categories
+  const confidence = {};
+  ALL_CATEGORIES.forEach(cat => confidence[cat] = 0);
+
+  // --------------------
+  // 1️⃣ Google Books API
+  // --------------------
   try {
     const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}&maxResults=3`);
     const bookData = await bookRes.json();
     if (bookData.items && bookData.items.length > 0) {
-      const exact = bookData.items.find(b =>
-        b.volumeInfo.title.toLowerCase() === lower
-      );
+      const exact = bookData.items.find(b => b.volumeInfo.title.toLowerCase() === lower);
       confidence.Books = exact ? 0.9 : 0.6;
-      if (isCapitalised) confidence.Books += 0.2;
+      if (isCapitalised) confidence.Books += 0.2; // capitalization boost ONLY for Books
     }
-  } catch (err) {
-    console.warn("Books API failed:", err);
-  }
+  } catch(err){ console.warn("Books API failed:", err); }
 
-  // ---- 2️⃣ TMDB Movies ----
+  // --------------------
+  // 2️⃣ TMDB Movies API
+  // --------------------
   try {
-    const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=YOUR_TMDB_KEY&query=${encodeURIComponent(text)}`);
+    const tmdbKey = 'YOUR_TMDB_KEY';
+    const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
     const movieData = await movieRes.json();
     if (movieData.results && movieData.results.length > 0) {
       const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
       confidence.Movies = exact ? 0.9 : 0.6;
-      if (isCapitalised) confidence.Movies += 0.2;
+      if (isCapitalised) confidence.Movies += 0.2; // capitalization boost ONLY for Movies
     }
-  } catch (err) {
-    console.warn("Movies API failed:", err);
+  } catch(err){ console.warn("Movies API failed:", err); }
+
+  // --------------------
+  // 3️⃣ Google Places API
+  // --------------------
+  if (window.google && window.google.maps) {
+    try {
+      const placeCat = await new Promise(resolve => {
+        const service = new google.maps.places.AutocompleteService();
+        service.getPlacePredictions({ input: text, types: ['establishment'] },
+          (predictions, status) => {
+            if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length)
+              return resolve(null);
+
+            const first = predictions[0];
+            const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+            detailsService.getDetails({ placeId: first.place_id, fields: ['types','geometry'] },
+              (place, detailsStatus) => {
+                if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
+                  let nearbyBoost = 0;
+                  let distKm = 999;
+
+                  if (userLat && userLng && place.geometry?.location) {
+                    distKm = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
+                    if (distKm < 5) nearbyBoost = 0.2;
+                  }
+
+                  // Map Google types to categories
+                  const typeMap = {
+                    cafe: 'Coffee',
+                    bar: 'Beverages',
+                    pub: 'Beverages',
+                    restaurant: 'Food',
+                  };
+                  let baseCat = null;
+                  for (let t of place.types) {
+                    if (typeMap[t]) { baseCat = typeMap[t]; break; }
+                  }
+                  if (!baseCat && place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','establishment'].includes(t)))
+                    baseCat = 'Places';
+
+                  if (baseCat) confidence[baseCat] = Math.max(confidence[baseCat], 0.6 + nearbyBoost);
+                }
+                resolve(null);
+              });
+          });
+      });
+    } catch(err){ console.warn("Places detection failed:", err); }
   }
 
-// --- Google Places detection ---
-if (window.google && window.google.maps) {
-  try {
-    const placeCat = await new Promise(resolve => {
-      const service = new google.maps.places.AutocompleteService();
-      service.getPlacePredictions(
-        { input: text, types: ['establishment'] },
-        (predictions, status) => {
-          if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length)
-            return resolve(null);
-
-          const first = predictions[0];
-          const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
-          detailsService.getDetails({ placeId: first.place_id, fields: ['types', 'geometry'] },
-            (place, detailsStatus) => {
-              if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
-                let distKm = 999;
-                let nearbyBoost = 0;
-
-                if (userLat && userLng && place.geometry?.location) {
-                  const R = 6371; // Earth radius in km
-                  const dLat = (place.geometry.location.lat() - userLat) * Math.PI / 180;
-                  const dLng = (place.geometry.location.lng() - userLng) * Math.PI / 180;
-                  const a = Math.sin(dLat/2)**2 + Math.cos(userLat*Math.PI/180) * Math.cos(place.geometry.location.lat()*Math.PI/180) * Math.sin(dLng/2)**2;
-                  distKm = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-                  if (distKm < 5) nearbyBoost = 0.2; // within 5 km
-                }
-
-                let baseCat = null;
-                if (place.types.includes('cafe')) baseCat = 'Coffee';
-                else if (place.types.includes('bar') || place.types.includes('pub')) baseCat = 'Beverages';
-                else if (place.types.includes('restaurant')) baseCat = 'Food';
-                else if (place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','establishment'].includes(t)))
-                  baseCat = 'Places';
-
-                if (baseCat) {
-                  resolve({ category: baseCat, confidence: 0.6 + nearbyBoost });
-                } else {
-                  resolve(null);
-                }
-              } else resolve(null);
-            }
-          );
-        }
-      );
-    });
-
-    if (placeCat) return placeCat.category;
-  } catch (err) {
-    console.warn('Places detection failed', err);
+  // --------------------
+  // 4️⃣ Keyword fallback
+  // --------------------
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(k => lower.includes(k))) {
+      confidence[cat] = Math.max(confidence[cat], 0.5);
+    }
   }
-}
-    
- // --- Fallback keyword check for generic foods ---
-const foodKeywords = ["restaurant", "cheese", "ramen", "blueberry", "coffee", "pizza", "bread", "fruit", "food", "snack"];
-if (foodKeywords.some(k => lower.includes(k)) && !confidence.Food) {
-  confidence.Food = 0.5;
+
+  // --------------------
+  // 5️⃣ Select final category
+  // --------------------
+  const sorted = Object.entries(confidence).sort((a,b) => b[1]-a[1]);
+  let [bestCat, bestScore] = sorted[0];
+  if (bestScore < 0.4) bestCat = 'Other';
+  const result = { category: bestCat, confidence: bestScore.toFixed(2), confidenceMap: confidence };
+
+  // Cache result
+  categoryCache[text] = result;
+  return result;
 }
 
 // === Main App ===
