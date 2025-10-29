@@ -37,29 +37,65 @@ const ALL_CATEGORIES = [
   'Cheese', 'Dates', 'People', 'Sports', 'Entertainment', 'Things', 'Other'
 ];
 
-// === Smart category detection ===
-    // On page load
+// Cache for category detection
 let categoryCache = {};
 try {
   const storedCache = localStorage.getItem("categoryCache");
   if (storedCache) categoryCache = JSON.parse(storedCache);
 } catch(err){ console.warn(err); }
 
-// Save cache
 function saveCache() {
   try { localStorage.setItem("categoryCache", JSON.stringify(categoryCache)); }
   catch(err){ console.warn(err); }
 }
 
-// Keyword fallbacks for categories
+// Enhanced keyword patterns with specificity
 const CATEGORY_KEYWORDS = {
-  Food: ["restaurant","cheese","ramen","blueberry","pizza","bread","fruit","food","snack","dinner","lunch","breakfast","meal"],
-  Coffee: ["coffee","cafe","latte","espresso","cappuccino","americano"],
-  Beverages: ["bar","pub","cocktail","brewery","beer","wine"],
-  Places: ["museum","park","beach","city","town","venue","holiday","trip","vacation","tourist_attraction"],
-  Things: ["shoes","bike","sneakers","sponges","jacket","laptop","bag","phone","watch","bike","sneakers","runners"],
+  Cheese: {
+    exact: ["cheese","cheddar","brie","gouda","mozzarella","parmesan","feta","camembert","gruyere","manchego","pecorino","ricotta","stilton","roquefort","gorgonzola","emmental","havarti","provolone"],
+    score: 0.8
+  },
+  Coffee: {
+    exact: ["coffee","cafe","latte","espresso","cappuccino","americano","macchiato","mocha","flat white","cortado","affogato"],
+    partial: ["starbucks","costa","cafe nero","pret"],
+    score: 0.7
+  },
+  Beverages: {
+    exact: ["bar","pub","cocktail","brewery","beer","wine","gin","vodka","whiskey","rum","tequila","ale","lager","cider","spirits","champagne","prosecco"],
+    partial: ["taproom","brewpub","tavern","lounge"],
+    score: 0.7
+  },
+  Food: {
+    exact: ["restaurant","ramen","pizza","burger","pasta","sushi","taco","curry","noodles","sandwich","steak","chicken","seafood","bakery","diner","bistro"],
+    partial: ["cuisine","eatery","grill","kitchen"],
+    score: 0.6
+  },
+  Places: {
+    exact: ["museum","park","beach","monument","gallery","plaza","square","garden","island","mountain","lake","resort","castle","palace","temple","cathedral"],
+    partial: ["tourist","attraction","landmark","historic"],
+    score: 0.5
+  },
+  Books: {
+    exact: ["novel","memoir","biography","poetry","textbook"],
+    partial: ["author","reading","literature"],
+    score: 0.6
+  },
+  Movies: {
+    exact: ["film","cinema","documentary","series","episode"],
+    partial: ["actor","director","netflix","disney"],
+    score: 0.5
+  },
+  Things: {
+    exact: ["shoes","bike","sneakers","jacket","laptop","bag","phone","watch","headphones","camera","tablet","keyboard","backpack","suitcase","umbrella"],
+    score: 0.6
+  },
+  Sports: {
+    exact: ["football","soccer","basketball","tennis","cricket","rugby","baseball","hockey","golf","swimming","match","championship","tournament"],
+    score: 0.6
+  }
 };
-// Helper: wait until Google Maps API is loaded
+
+// Helper: wait for Google Maps API
 function waitForGoogleMaps() {
   return new Promise(resolve => {
     if (window.google && window.google.maps) return resolve();
@@ -72,7 +108,7 @@ function waitForGoogleMaps() {
   });
 }
 
-// Helper: compute distance in km between two lat/lng points
+// Helper: compute distance in km
 function distanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -82,55 +118,79 @@ function distanceKm(lat1, lon1, lat2, lon2) {
     Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-// === Smart category detection ===
+
+// === Smart category detection with popularity & proximity ===
 async function detectCategory(inputText, userLat, userLng) {
   const text = inputText.trim();
-  if (!text) return { category: 'Other', confidence: '0.00', confidenceMap: {} };
+  if (!text) return 'Other';
 
   const lower = text.toLowerCase();
-  const isCapitalised = /^[A-Z]/.test(text);
-
+  
   // Check cache first
   if (categoryCache[text]) return categoryCache[text];
 
-  // Initialize confidence map
-  const confidence = {};
-  ALL_CATEGORIES.forEach(cat => confidence[cat] = 0);
+  // Initialize scores
+  const scores = {};
+  ALL_CATEGORIES.forEach(cat => scores[cat] = 0);
 
-  // --------------------
-  // 1️⃣ Google Books API
-  // --------------------
+  // 1️⃣ Keyword matching (fast, reliable baseline)
+  for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (config.exact?.some(k => lower.includes(k))) {
+      scores[category] = Math.max(scores[category], config.score);
+    }
+    if (config.partial?.some(k => lower.includes(k))) {
+      scores[category] = Math.max(scores[category], config.score * 0.7);
+    }
+  }
+
+  // 2️⃣ Google Books API (popularity weighted)
   try {
-    const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}&maxResults=3`);
+    const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(text)}&maxResults=5`);
     const bookData = await bookRes.json();
+    
     if (bookData.items?.length) {
-      const match = bookData.items.find(b => b.volumeInfo.title.toLowerCase().includes(lower));
-      confidence.Books = match ? 0.9 : 0.6;
-      if (isCapitalised) confidence.Books += 0.1;
+      const bestMatch = bookData.items[0];
+      const title = bestMatch.volumeInfo.title?.toLowerCase() || '';
+      const titleMatch = title === lower || title.includes(lower);
+      
+      // Score based on match quality and popularity
+      const ratingCount = bestMatch.volumeInfo.ratingsCount || 0;
+      const avgRating = bestMatch.volumeInfo.averageRating || 0;
+      const popularity = Math.min((ratingCount / 100) * avgRating, 10) / 10;
+      
+      if (titleMatch) {
+        scores.Books = Math.max(scores.Books, 0.7 + (popularity * 0.2));
+      } else if (bookData.items.length >= 3) {
+        scores.Books = Math.max(scores.Books, 0.4 + (popularity * 0.1));
+      }
     }
   } catch(err){ console.warn("Books API failed:", err); }
 
-  // --------------------
-  // 2️⃣ TMDB Movies API
-  // --------------------
+  // 3️⃣ TMDB Movies API (popularity weighted, but lower than books)
   try {
     const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8';
-    if (tmdbKey) {
-      const movieRes = await fetch(
-        `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`
-      );
-      const movieData = await movieRes.json();
-      if (movieData.results?.length) {
-        const match = movieData.results.find(m => m.title.toLowerCase().includes(lower));
-        confidence.Movies = match ? 0.9 : 0.6;
-        if (isCapitalised) confidence.Movies += 0.1;
+    const movieRes = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`
+    );
+    const movieData = await movieRes.json();
+    
+    if (movieData.results?.length) {
+      const bestMatch = movieData.results[0];
+      const title = bestMatch.title?.toLowerCase() || '';
+      const titleMatch = title === lower || title.includes(lower);
+      
+      // Movies get slightly lower base score than books
+      const popularity = Math.min(bestMatch.popularity / 100, 1);
+      
+      if (titleMatch) {
+        scores.Movies = Math.max(scores.Movies, 0.6 + (popularity * 0.2));
+      } else if (movieData.results.length >= 3) {
+        scores.Movies = Math.max(scores.Movies, 0.35 + (popularity * 0.1));
       }
     }
   } catch(err){ console.warn("Movies API failed:", err); }
 
-  // --------------------
-  // 3️⃣ Google Places API (top 5 predictions)
-  // --------------------
+  // 4️⃣ Google Places API (proximity heavily weighted)
   try {
     await waitForGoogleMaps();
     if (window.google?.maps) {
@@ -138,81 +198,85 @@ async function detectCategory(inputText, userLat, userLng) {
 
       const predictions = await new Promise(resolve => {
         service.getPlacePredictions({ input: text }, (preds, status) => {
-          resolve(status === google.maps.places.PlacesServiceStatus.OK ? preds?.slice(0,5) : []);
+          resolve(status === google.maps.places.PlacesServiceStatus.OK ? preds?.slice(0, 3) : []);
         });
       });
 
       if (predictions?.length) {
-        const typeScores = {}; 
         const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
-
-        await Promise.all(predictions.map(p => new Promise(res => {
-          detailsService.getDetails({ placeId: p.place_id, fields: ['types','geometry'] }, place => {
-            if (place?.types?.length) {
-              for (let t of place.types) typeScores[t] = (typeScores[t] || 0) + 1;
-
-              if (userLat && userLng && place.geometry?.location) {
-                const dist = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
-                if (dist < 5) typeScores['_proximity'] = (typeScores['_proximity'] || 0) + 1;
-              }
-            }
-            res();
-          });
+        
+        const placeResults = await Promise.all(predictions.map(p => new Promise(res => {
+          detailsService.getDetails({ 
+            placeId: p.place_id, 
+            fields: ['types', 'geometry', 'user_ratings_total', 'rating', 'name']
+          }, place => res(place));
         })));
 
-        const typeMap = {
-          cafe: 'Coffee',
-          bar: 'Beverages',
-          pub: 'Beverages',
-          restaurant: 'Food',
-          park: 'Places',
-          museum: 'Places',
-          tourist_attraction: 'Places',
-          point_of_interest: 'Places',
-          city: 'Places',
-          establishment: 'Other'
-        };
+        for (const place of placeResults) {
+          if (!place?.types) continue;
 
-        for (let [type, count] of Object.entries(typeScores)) {
-          if (type === '_proximity') continue;
-          const baseCat = typeMap[type] || null;
-          if (baseCat) {
-            let score = 0.4 + 0.2 * (count / predictions.length);
-            if (typeScores['_proximity']) score += 0.2; 
-            confidence[baseCat] = Math.max(confidence[baseCat], score);
+          let distance = Infinity;
+          let proximityBoost = 0;
+          
+          if (userLat && userLng && place.geometry?.location) {
+            distance = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
+            
+            // MAJOR boost for nearby places
+            if (distance < 1) proximityBoost = 0.5;
+            else if (distance < 5) proximityBoost = 0.3;
+            else if (distance < 20) proximityBoost = 0.15;
+          }
+
+          // Popularity from reviews
+          const reviewCount = place.user_ratings_total || 0;
+          const avgRating = place.rating || 0;
+          const popularity = Math.min((reviewCount / 500) * (avgRating / 5), 1);
+
+          // Name match bonus
+          const nameMatch = place.name?.toLowerCase().includes(lower) ? 0.2 : 0;
+
+          // Type mapping with base scores
+          const typeMap = {
+            cafe: { cat: 'Coffee', base: 0.7 },
+            bar: { cat: 'Beverages', base: 0.7 },
+            night_club: { cat: 'Beverages', base: 0.7 },
+            restaurant: { cat: 'Food', base: 0.65 },
+            meal_takeaway: { cat: 'Food', base: 0.6 },
+            food: { cat: 'Food', base: 0.6 },
+            museum: { cat: 'Places', base: 0.7 },
+            park: { cat: 'Places', base: 0.7 },
+            tourist_attraction: { cat: 'Places', base: 0.6 },
+            natural_feature: { cat: 'Places', base: 0.6 },
+            locality: { cat: 'Places', base: 0.5 },
+            country: { cat: 'Places', base: 0.6 },
+            administrative_area_level_1: { cat: 'Places', base: 0.5 }
+          };
+
+          for (const type of place.types) {
+            const mapping = typeMap[type];
+            if (mapping) {
+              const score = mapping.base + proximityBoost + (popularity * 0.1) + nameMatch;
+              scores[mapping.cat] = Math.max(scores[mapping.cat], score);
+            }
           }
         }
       }
     }
   } catch(err){ console.warn("Places detection failed:", err); }
 
-  // --------------------
-  // 4️⃣ Keyword fallback (only if nothing else is confident)
-  // --------------------
-  const maxConfidence = Math.max(...Object.values(confidence));
-  if (maxConfidence < 0.4) {
-    for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-      if (keywords.some(k => lower.includes(k))) {
-        confidence[cat] = 0.5;
-        break; // only assign one fallback
-      }
-    }
-  }
-
-  // --------------------
-  // 5️⃣ Select final category
-  // --------------------
-  const sorted = Object.entries(confidence).sort((a,b) => b[1]-a[1]);
+  // 5️⃣ Select best category
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   let [bestCat, bestScore] = sorted[0];
+  
+  // Require minimum confidence
   if (bestScore < 0.3) bestCat = 'Other';
 
-  const result = { category: bestCat, confidence: bestScore.toFixed(2), confidenceMap: confidence };
-
-  categoryCache[text] = result;
+  categoryCache[text] = bestCat;
   saveCache();
 
-  return result;
+  return bestCat;
 }
+
 // === Main App ===
 function BinaryApp() {
   const [items, setItems] = React.useState([]);
@@ -221,6 +285,7 @@ function BinaryApp() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [editingComment, setEditingComment] = React.useState(null);
   const [commentText, setCommentText] = React.useState('');
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   React.useEffect(() => {
     const stored = localStorage.getItem('binaryItems');
@@ -239,18 +304,26 @@ function BinaryApp() {
   };
 
   const addItem = async (rating) => {
-    if (!inputText.trim()) return;
-    const category = await detectCategory(inputText, window.userLat, window.userLng);
-    const newItem = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      rating,
-      category,
-      timestamp: Date.now(),
-      date: new Date().toLocaleDateString(),
-    };
-    saveItems([newItem, ...items]);
-    setInputText('');
+    if (!inputText.trim() || isProcessing) return;
+    
+    setIsProcessing(true);
+    try {
+      const category = await detectCategory(inputText, window.userLat, window.userLng);
+      const newItem = {
+        id: Date.now().toString(),
+        text: inputText.trim(),
+        rating,
+        category,
+        timestamp: Date.now(),
+        date: new Date().toLocaleDateString(),
+      };
+      saveItems([newItem, ...items]);
+      setInputText('');
+    } catch (err) {
+      console.error('Failed to add item:', err);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const updateCategory = (id, newCat) => {
@@ -292,7 +365,8 @@ function BinaryApp() {
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="What did you experience?"
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none"
-                onKeyPress={(e) => e.key === 'Enter' && inputText.trim() && document.getElementById('like-btn').focus()}
+                onKeyPress={(e) => e.key === 'Enter' && inputText.trim() && !isProcessing && document.getElementById('like-btn').focus()}
+                disabled={isProcessing}
               />
             </div>
           </div>
@@ -305,14 +379,20 @@ function BinaryApp() {
             <button
               id="like-btn"
               onClick={() => addItem('like')}
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || isProcessing}
               className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
-            ><ThumbsUp />Like</button>
+            >
+              <ThumbsUp />
+              {isProcessing ? 'Processing...' : 'Like'}
+            </button>
             <button
               onClick={() => addItem('dislike')}
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || isProcessing}
               className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
-            ><ThumbsDown />Dislike</button>
+            >
+              <ThumbsDown />
+              {isProcessing ? 'Processing...' : 'Dislike'}
+            </button>
           </div>
         </div>
 
