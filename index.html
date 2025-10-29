@@ -12,7 +12,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script 
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBNjg2ZqtsUmoXcMq-guhJAPwY9lIUNPkI&libraries=places"
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBNjgf2ZqtsUmoXcMq-guhJAPwY9lIUNPkI&libraries=places"
   async defer>
 </script>
 </head>
@@ -193,8 +193,8 @@ async function detectCategorySmart(text, userLat, userLng) {
     'People': ['person','friend','met','someone','colleague'],
     'Sports': ['tennis','game','played','match','workout','exercise','gym'],
     'Entertainment': ['show','series','music','concert','watched','read'],
-      'Books': ['book']
-      'Movies'['movie', 'film']
+      'Books': ['book'],
+      'Movies': ['movie', 'film']
   };
   for (const [cat, keywords] of Object.entries(categories)) {
     if (keywords.some(k => lowerText.includes(k))) return cat;
