@@ -255,11 +255,11 @@ async function detectMovieTitle(text) {
     const newItems = items.map(item => item.id === id ? {...item, category: newCat} : item);
     setItems(newItems);
     saveItems(newItems);
-          const deleteItem = (id) => {
+          };
+            const deleteItem = (id) => {
             const newItems = items.filter(item => item.id !== id);
             setItems(newItems);
             saveItems(newItems);
-          };
 
           const startEditingComment = (item) => {
             setEditingComment(item.id);
@@ -397,9 +397,15 @@ async function detectMovieTitle(text) {
                               <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
                                 {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'}
                               </span>
-                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                                {item.category}
-                              </span>
+                             <select
+  value={item.category}
+  onChange={(e) => updateCategory(item.id, e.target.value)}
+  className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700"
+>
+  {categories.filter(c => c !== 'All').map(c => (
+    <option key={c} value={c}>{c}</option>
+  ))}
+</select>
                             </div>
                             <p className="text-gray-800 font-medium mb-1">{item.text}</p>
                             <p className="text-sm text-gray-500">{item.date}</p>
