@@ -82,7 +82,7 @@ function distanceKm(lat1, lon1, lat2, lon2) {
     Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-// Main detection function
+// === Smart category detection ===
 async function detectCategory(inputText, userLat, userLng) {
   const text = inputText.trim();
   if (!text) return { category: 'Other', confidence: '0.00', confidenceMap: {} };
@@ -103,7 +103,7 @@ async function detectCategory(inputText, userLat, userLng) {
   try {
     const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}&maxResults=3`);
     const bookData = await bookRes.json();
-    if (bookData.items && bookData.items.length > 0) {
+    if (bookData.items?.length) {
       const exact = bookData.items.find(b => b.volumeInfo.title.toLowerCase() === lower);
       confidence.Books = exact ? 0.9 : 0.6;
       if (isCapitalised) confidence.Books += 0.2;
@@ -115,12 +115,12 @@ async function detectCategory(inputText, userLat, userLng) {
   // --------------------
   try {
     const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8';
-   if (tmdbKey) {  // only run if key is set
-    const movieRes = await fetch(
-      `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`
-    );
-    const movieData = await movieRes.json();
-      if (movieData.results && movieData.results.length > 0) {
+    if (tmdbKey) {
+      const movieRes = await fetch(
+        `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`
+      );
+      const movieData = await movieRes.json();
+      if (movieData.results?.length) {
         const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
         confidence.Movies = exact ? 0.9 : 0.6;
         if (isCapitalised) confidence.Movies += 0.2;
@@ -129,46 +129,51 @@ async function detectCategory(inputText, userLat, userLng) {
   } catch(err){ console.warn("Movies API failed:", err); }
 
   // --------------------
-  // 3️⃣ Google Places API
+  // 3️⃣ Google Places API (weighted top 5)
   // --------------------
   try {
     await waitForGoogleMaps();
-    if (window.google && window.google.maps) {
-      await new Promise(resolve => {
-        const service = new google.maps.places.AutocompleteService();
-        service.getPlacePredictions({ input: text, types: ['establishment'] },
-          (predictions, status) => {
-            if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length) return resolve();
+    if (window.google?.maps) {
+      const service = new google.maps.places.AutocompleteService();
 
-            const first = predictions[0];
-            const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
-            detailsService.getDetails({ placeId: first.place_id, fields: ['types','geometry'] },
-              (place, detailsStatus) => {
-                if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
-                  let nearbyBoost = 0;
-                  if (userLat && userLng && place.geometry?.location) {
-                    const dist = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
-                    if (dist < 5) nearbyBoost = 0.2;
-                  }
-
-                  const typeMap = { cafe:'Coffee', bar:'Beverages', pub:'Beverages', restaurant:'Food', park:'Places',
-                  museum:'Places',
-                  tourist_attraction:'Places',
-                  locality:'Places',
-                  sublocality:'Places',
-                  administrative_area_level_1:'Places',
-                  country:'Places' };
-                  let baseCat = null;
-                  for (let t of place.types) if (typeMap[t]) { baseCat = typeMap[t]; break; }
-                  if (!baseCat && place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','locality','sublocality','administrative_area_level_1','establishment'].includes(t)))
-                    baseCat = 'Places';
-
-                  if (baseCat) confidence[baseCat] = Math.max(confidence[baseCat], 0.6 + nearbyBoost);
-                }
-                resolve();
-              });
-          });
+      const predictions = await new Promise(resolve => {
+        service.getPlacePredictions({ input: text }, (preds, status) => {
+          resolve(status === google.maps.places.PlacesServiceStatus.OK ? preds?.slice(0,5) : []);
+        });
       });
+
+      if (predictions?.length) {
+        const typeScores = {}; 
+        const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+
+        // Fetch details for top 5 predictions
+        await Promise.all(predictions.map(p => new Promise(res => {
+          detailsService.getDetails({ placeId: p.place_id, fields: ['types','geometry'] }, place => {
+            if (place?.types?.length) {
+              for (let t of place.types) typeScores[t] = (typeScores[t] || 0) + 1;
+
+              // Proximity boost
+              if (userLat && userLng && place.geometry?.location) {
+                const dist = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
+                if (dist < 5) typeScores['_proximity'] = (typeScores['_proximity'] || 0) + 1;
+              }
+            }
+            res();
+          });
+        })));
+
+        // Map types to categories and compute confidence
+        const typeMap = { cafe:'Coffee', bar:'Beverages', pub:'Beverages', restaurant:'Food', park:'Places', museum:'Places', tourist_attraction:'Places', point_of_interest:'Places' };
+        for (let [type, count] of Object.entries(typeScores)) {
+          if (type === '_proximity') continue;
+          const baseCat = typeMap[type] || null;
+          if (baseCat) {
+            let score = 0.4 + 0.2 * (count / predictions.length);
+            if (typeScores['_proximity']) score += 0.2; 
+            confidence[baseCat] = Math.max(confidence[baseCat], score);
+          }
+        }
+      }
     }
   } catch(err){ console.warn("Places detection failed:", err); }
 
@@ -194,8 +199,8 @@ async function detectCategory(inputText, userLat, userLng) {
   categoryCache[text] = result;
   saveCache();
 
-  return result;}
-
+  return result;
+}
 // === Main App ===
 function BinaryApp() {
   const [items, setItems] = React.useState([]);
