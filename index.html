@@ -1,459 +1,332 @@
-import React, { useState, useEffect } from 'react';
-import {
-  ThumbsUp,
-  ThumbsDown,
-  Mic,
-  Plus,
-  Trash2,
-  Filter,
-  MessageSquare,
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Binary">
+    <title>Binary</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const ThumbsUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>;
+        const ThumbsDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>;
+        const Mic = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>;
+        const List = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>;
+        const Trash2 = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
+        const Filter = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
+        const MessageSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
 
-export default function LifeRatingTracker() {
-  const [items, setItems] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(true);
-  const [editingComment, setEditingComment] = useState(null);
-  const [commentText, setCommentText] = useState('');
+        function BinaryApp() {
+          const [items, setItems] = useState([]);
+          const [inputText, setInputText] = useState('');
+          const [selectedCategory, setSelectedCategory] = useState('All');
+          const [isLoading, setIsLoading] = useState(true);
+          const [editingComment, setEditingComment] = useState(null);
+          const [commentText, setCommentText] = useState('');
 
-  // Load items on mount
-  useEffect(() => {
-    loadItems();
-  }, []);
+          useEffect(() => {
+            loadItems();
+          }, []);
 
-  const loadItems = async () => {
-    try {
-      const keys = await window.storage.list('item:');
-      if (keys && keys.keys) {
-        const loadedItems = [];
-        for (const key of keys.keys) {
-          try {
-            const result = await window.storage.get(key);
-            if (result) {
-              loadedItems.push(JSON.parse(result.value));
+          const loadItems = () => {
+            try {
+              const stored = localStorage.getItem('binaryItems');
+              if (stored) {
+                setItems(JSON.parse(stored));
+              }
+            } catch (error) {
+              console.error('Error loading items:', error);
             }
-          } catch (e) {
-            console.log('Key not found:', key);
+            setIsLoading(false);
+          };
+
+          const saveItems = (newItems) => {
+            try {
+              localStorage.setItem('binaryItems', JSON.stringify(newItems));
+            } catch (error) {
+              console.error('Error saving items:', error);
+              alert('Failed to save. Storage might be full.');
+            }
+          };
+
+          const detectCategory = (text) => {
+            const lower = text.toLowerCase();
+            
+            const categories = {
+              'Food': ['restaurant', 'meal', 'dinner', 'lunch', 'breakfast', 'food', 'dish', 'ate', 'eating'],
+              'Cheese': ['cheese', 'brie', 'cheddar', 'gouda', 'mozzarella', 'parmesan'],
+              'Coffee': ['coffee', 'cafe', 'espresso', 'latte', 'cappuccino', 'americano'],
+              'Dates': ['date', 'dating', 'went out', 'met up'],
+              'People': ['person', 'friend', 'met', 'someone', 'colleague'],
+              'Sports': ['tennis', 'game', 'played', 'match', 'workout', 'exercise', 'gym'],
+              'Entertainment': ['movie', 'show', 'series', 'book', 'music', 'concert', 'watched', 'read'],
+              'Places': ['visited', 'trip', 'travel', 'location', 'bar', 'club', 'venue']
+            };
+
+            for (const [category, keywords] of Object.entries(categories)) {
+              if (keywords.some(keyword => lower.includes(keyword))) {
+                return category;
+              }
+            }
+            
+            return 'Other';
+          };
+
+          const addItem = (rating) => {
+            if (!inputText.trim()) return;
+
+            const newItem = {
+              id: Date.now().toString(),
+              text: inputText.trim(),
+              rating: rating,
+              category: detectCategory(inputText),
+              timestamp: Date.now(),
+              date: new Date().toLocaleDateString()
+            };
+
+            const newItems = [newItem, ...items];
+            setItems(newItems);
+            saveItems(newItems);
+            setInputText('');
+          };
+
+          const deleteItem = (id) => {
+            const newItems = items.filter(item => item.id !== id);
+            setItems(newItems);
+            saveItems(newItems);
+          };
+
+          const startEditingComment = (item) => {
+            setEditingComment(item.id);
+            setCommentText(item.comment || '');
+          };
+
+          const saveComment = (id) => {
+            const newItems = items.map(item => 
+              item.id === id ? { ...item, comment: commentText.trim() } : item
+            );
+            setItems(newItems);
+            saveItems(newItems);
+            setEditingComment(null);
+            setCommentText('');
+          };
+
+          const cancelEditingComment = () => {
+            setEditingComment(null);
+            setCommentText('');
+          };
+
+          const categories = ['All', ...new Set(items.map(item => item.category))].sort();
+          
+          const filteredItems = selectedCategory === 'All' 
+            ? items 
+            : items.filter(item => item.category === selectedCategory);
+
+          const getRatingEmoji = (rating) => {
+            return rating === 'like' ? '👍' : '👎';
+          };
+
+          const getRatingColor = (rating) => {
+            return rating === 'like' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300';
+          };
+
+          if (isLoading) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+                <div className="text-gray-600">Loading...</div>
+              </div>
+            );
           }
-        }
-        setItems(loadedItems.sort((a, b) => b.timestamp - a.timestamp));
-      }
-    } catch (error) {
-      console.error('Error loading items:', error);
-    }
-    setIsLoading(false);
-  };
 
-  const detectCategory = (text) => {
-    const lower = text.toLowerCase();
-    const categories = {
-      Food: [
-        'restaurant',
-        'meal',
-        'dinner',
-        'lunch',
-        'breakfast',
-        'brunch',
-        'food',
-        'dish',
-        'ate',
-        'eating',
-        'pizza',
-        'burger',
-        'sushi',
-        'pasta',
-        'salad',
-        'sandwich',
-        'soup',
-        'steak',
-        'chicken',
-        'fish',
-        'seafood',
-        'vegetarian',
-        'vegan',
-        'dessert',
-        'ice cream',
-        'bakery',
-        'deli',
-        'takeout',
-        'delivery',
-        'menu',
-        'ordered',
-        'chef',
-        'cuisine',
-      ],
-      Cheese: [
-        'cheese',
-        'brie',
-        'cheddar',
-        'gouda',
-        'mozzarella',
-        'parmesan',
-        'feta',
-        'blue cheese',
-        'camembert',
-        'gruyere',
-        'swiss',
-        'provolone',
-        'ricotta',
-        'manchego',
-      ],
-      'Coffee & Tea': [
-        'coffee',
-        'cafe',
-        'espresso',
-        'latte',
-        'cappuccino',
-        'tea',
-        'matcha',
-        'chai',
-        'boba',
-      ],
-      Beverages: [
-        'drink',
-        'cocktail',
-        'beer',
-        'wine',
-        'whiskey',
-        'vodka',
-        'gin',
-        'rum',
-        'juice',
-        'smoothie',
-        'soda',
-      ],
-      Romance: [
-        'date',
-        'tinder',
-        'bumble',
-        'partner',
-        'boyfriend',
-        'girlfriend',
-        'romantic',
-      ],
-      Social: [
-        'friend',
-        'met',
-        'party',
-        'gathering',
-        'hangout',
-        'conversation',
-        'team',
-        'colleague',
-      ],
-      'Sports & Fitness': [
-        'workout',
-        'exercise',
-        'run',
-        'jogging',
-        'yoga',
-        'gym',
-        'tennis',
-        'match',
-        'game',
-      ],
-      Entertainment: [
-        'movie',
-        'film',
-        'series',
-        'book',
-        'music',
-        'song',
-        'concert',
-        'show',
-        'podcast',
-      ],
-      Products: [
-        'bought',
-        'shopping',
-        'store',
-        'brand',
-        'amazon',
-        'tech',
-        'clothes',
-      ],
-      Places: [
-        'visited',
-        'trip',
-        'travel',
-        'vacation',
-        'hotel',
-        'beach',
-        'park',
-      ],
-      Work: [
-        'work',
-        'job',
-        'office',
-        'meeting',
-        'project',
-        'deadline',
-        'boss',
-      ],
-      'Health & Wellness': [
-        'doctor',
-        'therapy',
-        'hospital',
-        'wellness',
-        'sleep',
-        'massage',
-      ],
-      Hobbies: [
-        'hobby',
-        'painting',
-        'drawing',
-        'photography',
-        'baking',
-        'cooking',
-        'gaming',
-      ],
-    };
-
-    for (const [category, keywords] of Object.entries(categories)) {
-      if (keywords.some((keyword) => lower.includes(keyword))) {
-        return category;
-      }
-    }
-    return 'Other';
-  };
-
-  const addItem = async (rating) => {
-    if (!inputText.trim()) return;
-    const newItem = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      rating,
-      category: detectCategory(inputText),
-      timestamp: Date.now(),
-      date: new Date().toLocaleDateString(),
-    };
-
-    try {
-      await window.storage.set(`item:${newItem.id}`, JSON.stringify(newItem));
-      setItems((prev) => [newItem, ...prev]);
-      setInputText('');
-    } catch (error) {
-      console.error('Error saving item:', error);
-      alert('Failed to save item. Please try again.');
-    }
-  };
-
-  const deleteItem = async (id) => {
-    try {
-      await window.storage.delete(`item:${id}`);
-      setItems((prev) => prev.filter((item) => item.id !== id));
-    } catch (error) {
-      console.error('Error deleting item:', error);
-    }
-  };
-
-  const startEditingComment = (item) => {
-    setEditingComment(item.id);
-    setCommentText(item.comment || '');
-  };
-
-  const saveComment = async (id) => {
-    try {
-      const item = items.find((i) => i.id === id);
-      const updatedItem = { ...item, comment: commentText.trim() };
-      await window.storage.set(`item:${id}`, JSON.stringify(updatedItem));
-      setItems((prev) => prev.map((i) => (i.id === id ? updatedItem : i)));
-      setEditingComment(null);
-      setCommentText('');
-    } catch (error) {
-      console.error('Error saving comment:', error);
-      alert('Failed to save comment. Please try again.');
-    }
-  };
-
-  const cancelEditingComment = () => {
-    setEditingComment(null);
-    setCommentText('');
-  };
-
-  const categories = ['All', ...new Set(items.map((item) => item.category))].sort();
-  const filteredItems =
-    selectedCategory === 'All'
-      ? items
-      : items.filter((item) => item.category === selectedCategory);
-
-  const getRatingEmoji = (rating) => (rating === 'like' ? '👍' : '👎');
-
-  if (isLoading) {
-    return <div className="p-6 text-center text-gray-500">Loading...</div>;
-  }
-
-  return (
-    <div className="max-w-xl mx-auto p-6 space-y-6">
-      {/* Header */}
-      <h1 className="text-2xl font-bold text-gray-800 text-center">Binary</h1>
-      <p className="text-center text-gray-500 mb-4">Yes/no, that's all</p>
-
-      {/* Input Section */}
-      <div className="flex flex-col gap-4">
-        <input
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="What did you experience? (e.g., 'Tried aged cheddar')"
-          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none"
-          onKeyPress={(e) =>
-            e.key === 'Enter' &&
-            inputText.trim() &&
-            document.getElementById('like-btn').focus()
-          }
-        />
-
-        <p className="text-sm text-gray-500 text-center">
-          Tap the microphone icon on your keyboard to use voice input
-        </p>
-
-        <div className="flex gap-2">
-          <button
-            id="like-btn"
-            onClick={() => addItem('like')}
-            disabled={!inputText.trim()}
-            className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
-          >
-            <ThumbsUp className="w-5 h-5" /> Like
-          </button>
-          <button
-            onClick={() => addItem('dislike')}
-            disabled={!inputText.trim()}
-            className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
-          >
-            <ThumbsDown className="w-5 h-5" /> Dislike
-          </button>
-        </div>
-      </div>
-
-      {/* Category Filter */}
-      {items.length > 0 && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <span className="text-gray-700 text-sm font-medium">
-            Filter by category:
-          </span>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                selectedCategory === cat
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Items List */}
-      <div className="space-y-4">
-        {filteredItems.length === 0 ? (
-          <p className="text-center text-gray-500">
-            {items.length === 0
-              ? 'No ratings yet. Start by rating your first experience!'
-              : 'No items in this category yet.'}
-          </p>
-        ) : (
-          filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white p-4 rounded-2xl shadow-md flex justify-between items-start"
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span>{getRatingEmoji(item.rating)}</span>
-                  <span className="font-semibold text-gray-800">
-                    {item.rating === 'like' ? 'Liked' : 'Disliked'}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    ({item.category})
-                  </span>
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
+              <div className="max-w-2xl mx-auto px-4 py-6">
+                <div className="text-center mb-6">
+                  <h1 className="text-3xl font-bold text-gray-800 mb-2">Binary</h1>
+                  <p className="text-gray-600">Yes/no, that's all</p>
                 </div>
-                <p className="text-gray-700">{item.text}</p>
-                <p className="text-xs text-gray-400 mt-1">{item.date}</p>
 
-                {/* Comment Section */}
-                {editingComment === item.id ? (
-                  <div className="mt-3">
-                    <textarea
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Add your thoughts..."
-                      className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none"
-                      rows="3"
-                      autoFocus
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => saveComment(item.id)}
-                        className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={cancelEditingComment}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Cancel
-                      </button>
+                <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        placeholder="What did you experience?"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none"
+                        onKeyPress={(e) => e.key === 'Enter' && inputText.trim() && document.getElementById('like-btn').focus()}
+                      />
+                      <div className="absolute right-3 top-3.5 text-gray-400"><Mic /></div>
                     </div>
                   </div>
-                ) : (
-                  <>
-                    {item.comment && (
-                      <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-700 italic">
-                          {item.comment}
-                        </p>
-                      </div>
-                    )}
+                  
+                  <div className="text-xs text-gray-500 mb-3 text-center">
+                    Tap the microphone icon on your keyboard to use voice input
+                  </div>
+
+                  <div className="flex gap-3">
                     <button
-                      onClick={() => startEditingComment(item)}
-                      className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                      id="like-btn"
+                      onClick={() => addItem('like')}
+                      disabled={!inputText.trim()}
+                      className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
                     >
-                      <MessageSquare className="w-4 h-4" />
-                      {item.comment ? 'Edit comment' : 'Add comment'}
+                      <ThumbsUp />
+                      Like
                     </button>
-                  </>
+                    <button
+                      onClick={() => addItem('dislike')}
+                      disabled={!inputText.trim()}
+                      className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <ThumbsDown />
+                      Dislike
+                    </button>
+                  </div>
+                </div>
+
+                {items.length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Filter />
+                      <span className="font-semibold text-gray-700">Filter by category:</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {categories.map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setSelectedCategory(cat)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            selectedCategory === cat
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {filteredItems.length === 0 ? (
+                    <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+                      <div className="flex justify-center mb-4"><List /></div>
+                      <p className="text-gray-500">
+                        {items.length === 0 
+                          ? "No ratings yet. Start by rating your first experience!"
+                          : "No items in this category yet."}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredItems.map(item => (
+                      <div
+                        key={item.id}
+                        className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
+                                {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'}
+                              </span>
+                              <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                                {item.category}
+                              </span>
+                            </div>
+                            <p className="text-gray-800 font-medium mb-1">{item.text}</p>
+                            <p className="text-sm text-gray-500">{item.date}</p>
+                            
+                            {editingComment === item.id ? (
+                              <div className="mt-3 space-y-2">
+                                <textarea
+                                  value={commentText}
+                                  onChange={(e) => setCommentText(e.target.value)}
+                                  placeholder="Add your thoughts..."
+                                  className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none"
+                                  rows="3"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => saveComment(item.id)}
+                                    className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEditingComment}
+                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {item.comment && (
+                                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                                    <p className="text-sm text-gray-700 italic">{item.comment}</p>
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => startEditingComment(item)}
+                                  className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"
+                                >
+                                  <MessageSquare />
+                                  {item.comment ? 'Edit comment' : 'Add comment'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => deleteItem(item.id)}
+                            className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {items.length > 0 && (
+                  <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
+                    <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-4 bg-green-50 rounded-xl">
+                        <div className="text-3xl font-bold text-green-600">
+                          {items.filter(i => i.rating === 'like').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Liked</div>
+                      </div>
+                      <div className="text-center p-4 bg-red-50 rounded-xl">
+                        <div className="text-3xl font-bold text-red-600">
+                          {items.filter(i => i.rating === 'dislike').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Disliked</div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
+            </div>
+          );
+        }
 
-              <button
-                onClick={() => deleteItem(item.id)}
-                className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Stats */}
-      {items.length > 0 && (
-        <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-xl">
-              <div className="text-3xl font-bold text-green-600">
-                {items.filter((i) => i.rating === 'like').length}
-              </div>
-              <div className="text-sm text-gray-600">Liked</div>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-xl">
-              <div className="text-3xl font-bold text-red-600">
-                {items.filter((i) => i.rating === 'dislike').length}
-              </div>
-              <div className="text-sm text-gray-600">Disliked</div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        ReactDOM.render(<BinaryApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
