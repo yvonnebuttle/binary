@@ -31,7 +31,7 @@
 // === Google Places category detection ===
 async function detectPlaceCategory(text) {
   return new Promise((resolve) => {
-    if (!window.google) {
+    if (!window.google || !window.google.maps) {
       resolve(null); // Google Maps not loaded yet
       return;
     }
@@ -124,27 +124,33 @@ async function detectPlaceCategory(text) {
           const addItem = async (rating) => {
   if (!inputText.trim()) return;
 
-  // Step 2: Try detecting a place category first
-  let category = await detectPlaceCategory(inputText);
+  try {
+    // ✅ Loading fallback: only call Google Places if API is loaded
+    let category = null;
+    if (window.google && window.google.maps) {
+      category = await detectPlaceCategory(inputText);
+    }
 
-  // Step 3: Fallback to your keyword-based mapping if no place detected
-  if (!category) category = detectCategory(inputText);
+    // Fallback to keyword-based detection if Google Places is not ready
+    if (!category) category = detectCategory(inputText);
 
-  // Step 4: Create the new item with the determined category
-  const newItem = {
-    id: Date.now().toString(),
-    text: inputText.trim(),
-    rating,
-    category,
-    timestamp: Date.now(),
-    date: new Date().toLocaleDateString()
-  };
+    const newItem = {
+      id: Date.now().toString(),
+      text: inputText.trim(),
+      rating,
+      category,
+      timestamp: Date.now(),
+      date: new Date().toLocaleDateString()
+    };
 
-  // Step 5: Update state and localStorage
-  const newItems = [newItem, ...items];
-  setItems(newItems);
-  saveItems(newItems);
-  setInputText('');
+    const newItems = [newItem, ...items];
+    setItems(newItems);
+    saveItems(newItems);
+    setInputText('');
+  } catch (err) {
+    console.error('Error adding item:', err);
+    alert('Failed to add item. Try again.');
+  }
 };
 
           const deleteItem = (id) => {
