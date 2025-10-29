@@ -250,37 +250,40 @@ async function detectMovieTitle(text) {
       alert('Failed to add item. Try again.');
     }
   };
-  // --- Update category manually ---
-  const updateCategory = (id, newCat) => {
-    const newItems = items.map(item => item.id === id ? {...item, category: newCat} : item);
-    setItems(newItems);
-    saveItems(newItems);
-          };
-            const deleteItem = (id) => {
-            const newItems = items.filter(item => item.id !== id);
-            setItems(newItems);
-            saveItems(newItems);
+// --- Update category manually ---
+const updateCategory = (id, newCat) => {
+  const newItems = items.map(item => item.id === id ? { ...item, category: newCat } : item);
+  setItems(newItems);
+  saveItems(newItems);
+};
 
-          const startEditingComment = (item) => {
-            setEditingComment(item.id);
-            setCommentText(item.comment || '');
-          };
+// --- Delete an item ---
+const deleteItem = (id) => {
+  const newItems = items.filter(item => item.id !== id);
+  setItems(newItems);
+  saveItems(newItems);
+};
 
-          const saveComment = (id) => {
-            const newItems = items.map(item => 
-              item.id === id ? { ...item, comment: commentText.trim() } : item
-            );
-            setItems(newItems);
-            saveItems(newItems);
-            setEditingComment(null);
-            setCommentText('');
-          };
+// --- Comment editing ---
+const startEditingComment = (item) => {
+  setEditingComment(item.id);
+  setCommentText(item.comment || '');
+};
 
-          const cancelEditingComment = () => {
-            setEditingComment(null);
-            setCommentText('');
-          };
+const saveComment = (id) => {
+  const newItems = items.map(item =>
+    item.id === id ? { ...item, comment: commentText.trim() } : item
+  );
+  setItems(newItems);
+  saveItems(newItems);
+  setEditingComment(null);
+  setCommentText('');
+};
 
+const cancelEditingComment = () => {
+  setEditingComment(null);
+  setCommentText('');
+};
           const categories = ['All', ...new Set(items.map(item => item.category))].sort();
           
           const filteredItems = selectedCategory === 'All' 
