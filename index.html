@@ -90,7 +90,19 @@ const CATEGORY_KEYWORDS = {
     score: 0.6
   },
   Sports: {
-    exact: ["football","soccer","basketball","tennis","cricket","rugby","baseball","hockey","golf","swimming","match","championship","tournament"],
+    exact: ["football","soccer","basketball","tennis","cricket","rugby","baseball","hockey","golf","swimming","match","championship","tournament","surfing","skiing","snowboarding","skateboarding","climbing","hiking","running","cycling","yoga","pilates","boxing","wrestling","martial arts","karate","judo","gymnastics","athletics","track","field"],
+    score: 0.7
+  },
+  Dates: {
+    exact: ["date","dating","romantic","anniversary","valentine","proposal","engagement","wedding","relationship","boyfriend","girlfriend","partner","spouse"],
+    score: 0.7
+  },
+  People: {
+    exact: ["person","friend","colleague","coworker","manager","boss","teacher","professor","doctor","nurse","artist","musician","celebrity","politician","athlete","neighbor","roommate","classmate"],
+    score: 0.6
+  },
+  Entertainment: {
+    exact: ["concert","festival","show","performance","theater","theatre","comedy","stand-up","magic","circus","exhibition","gig","club","nightclub","disco","rave","party","event"],
     score: 0.6
   }
 };
@@ -190,7 +202,7 @@ async function detectCategory(inputText, userLat, userLng) {
     }
   } catch(err){ console.warn("Movies API failed:", err); }
 
-  // 4️⃣ Google Places API (proximity heavily weighted)
+  // 4️⃣ Google Places API (proximity heavily weighted for LOCAL places only)
   try {
     await waitForGoogleMaps();
     if (window.google?.maps) {
@@ -218,13 +230,21 @@ async function detectCategory(inputText, userLat, userLng) {
           let distance = Infinity;
           let proximityBoost = 0;
           
+          // Check if this is a major place (city, country, famous landmark)
+          const isMajorPlace = place.types.some(t => 
+            ['locality', 'country', 'administrative_area_level_1', 'natural_feature', 
+             'continent', 'archipelago', 'colloquial_area'].includes(t)
+          );
+          
           if (userLat && userLng && place.geometry?.location) {
             distance = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
             
-            // MAJOR boost for nearby places
-            if (distance < 1) proximityBoost = 0.5;
-            else if (distance < 5) proximityBoost = 0.3;
-            else if (distance < 20) proximityBoost = 0.15;
+            // Only apply proximity boost for LOCAL businesses, not major places
+            if (!isMajorPlace) {
+              if (distance < 1) proximityBoost = 0.5;
+              else if (distance < 5) proximityBoost = 0.3;
+              else if (distance < 20) proximityBoost = 0.15;
+            }
           }
 
           // Popularity from reviews
@@ -245,11 +265,14 @@ async function detectCategory(inputText, userLat, userLng) {
             food: { cat: 'Food', base: 0.6 },
             museum: { cat: 'Places', base: 0.7 },
             park: { cat: 'Places', base: 0.7 },
-            tourist_attraction: { cat: 'Places', base: 0.6 },
-            natural_feature: { cat: 'Places', base: 0.6 },
-            locality: { cat: 'Places', base: 0.5 },
-            country: { cat: 'Places', base: 0.6 },
-            administrative_area_level_1: { cat: 'Places', base: 0.5 }
+            tourist_attraction: { cat: 'Places', base: 0.7 },
+            natural_feature: { cat: 'Places', base: 0.75 },
+            locality: { cat: 'Places', base: 0.8 },      // Cities get HIGH base score
+            country: { cat: 'Places', base: 0.85 },       // Countries get HIGHEST score
+            administrative_area_level_1: { cat: 'Places', base: 0.75 }, // States/regions
+            continent: { cat: 'Places', base: 0.85 },
+            archipelago: { cat: 'Places', base: 0.75 },
+            colloquial_area: { cat: 'Places', base: 0.7 }
           };
 
           for (const type of place.types) {
