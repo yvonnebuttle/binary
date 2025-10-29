@@ -1,274 +1,250 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>Binary</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script 
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBNjgf2ZqtsUmoXcMq-guhJAPwY9lIUNPkI&libraries=places"
-    async defer>
-  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Binary">
+<title>Binary</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script 
+src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBNjg2ZqtsUmoXcMq-guhJAPwY9lIUNPkI&libraries=places"
+async defer>
+</script>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect } = React;
+<div id="root"></div>
 
-    // --- SVG Icons ---
-    const ThumbsUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>;
-    const ThumbsDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>;
-    const Trash2 = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
-    const MessageSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+<script type="text/babel">
+const { useState, useEffect } = React;
 
-    // --- Smart Category Detection ---
-    const categoryCache = {}; // simple in-memory cache
+// === SVG icons ===
+const ThumbsUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>;
+const ThumbsDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>;
+const Mic = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>;
+const List = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>;
+const Trash2 = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
+const Filter = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
+const MessageSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
 
-    async function detectCategorySmart(text, userLat, userLng) {
-      const lowerText = text.toLowerCase();
+// === Master category list ===
+const ALL_CATEGORIES = [
+'Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies',
+'Cheese', 'Dates', 'People', 'Sports', 'Entertainment', 'Other'
+];
 
-      // --- 0️⃣ Check cache ---
-      if (categoryCache[lowerText]) return categoryCache[lowerText];
+// === Smart category detection ===
+// In-memory cache for previously detected categories
+const categoryCache = {}; // text -> { category, confidence }
 
-      // --- 1️⃣ Google Places detection ---
-      if (window.google && window.google.maps) {
-        try {
-          const cat = await new Promise(resolve => {
-            const service = new google.maps.places.AutocompleteService();
-            service.getPlacePredictions({ input: text, types: ['establishment'] }, (predictions, status) => {
-              if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length) { resolve(null); return; }
-              const first = predictions[0];
-              const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
-              detailsService.getDetails({ placeId: first.place_id, fields: ['types','geometry'] }, (place, detailsStatus) => {
-                if (detailsStatus !== google.maps.places.PlacesServiceStatus.OK || !place?.types) { resolve(null); return; }
+const ALL_CATEGORIES = ['Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies', 'Things', 'Other'];
 
-                // proximity check (~2km)
-                let proxScore = 0;
-                if (userLat && userLng && place.geometry?.location) {
-                  const dLat = place.geometry.location.lat() - userLat;
-                  const dLng = place.geometry.location.lng() - userLng;
-                  const dist = Math.sqrt(dLat*dLat + dLng*dLng);
-                  if (dist < 0.02) proxScore = 1;
-                }
+// Keyword fallbacks for categories
+const CATEGORY_KEYWORDS = {
+  Food: ["restaurant","cheese","ramen","blueberry","pizza","bread","fruit","food","snack","dinner","lunch","breakfast","meal"],
+  Coffee: ["coffee","cafe","latte","espresso","cappuccino","americano"],
+  Beverages: ["bar","pub","cocktail","brewery","beer","wine"],
+  Places: ["museum","park","beach","city","town","venue","holiday","trip","vacation","tourist_attraction"],
+  Things: ["shoes","bike","sneakers","sponges","jacket","laptop","bag","phone","watch","bike","sneakers","runners"],
+};
 
-                let detected = null;
-                if (place.types.includes('cafe')) detected = 'Coffee';
-                else if (place.types.includes('restaurant')) detected = 'Food';
-                else if (place.types.includes('bar')) detected = 'Beverages';
-                else if (place.types.includes('park') || place.types.includes('museum') || place.types.includes('tourist_attraction')) detected = 'Places';
+// Helper: compute distance in km between two lat/lng points
+function distanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat/2)**2 +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
-                resolve(detected);
-              });
-            });
-          });
+// Main detection function
+async function detectCategory(inputText, userLat, userLng) {
+const text = inputText.trim();
+const lower = text.toLowerCase();
+const isCapitalised = /^[A-Z]/.test(text);
+  const confidence = { Books: 0, Movies: 0, Places: 0, Food: 0, Other: 0 };
+  let placeDistance = null;
+  let isFoodPlaceNearby = false;
+  let isGenericPlaceNearby = false;
 
-          if (cat) { categoryCache[lowerText] = cat; return cat; }
-        } catch(err){ console.warn('Google detection failed', err); }
-      }
+  // ---- 1️⃣ Google Books ----
+  // Check cache first
+  if (categoryCache[text]) return categoryCache[text];
 
-      // --- 2️⃣ Keyword fallback ---
-      const keywords = {
-        'Food': ['restaurant','meal','lunch','dinner','food','dish'],
-        'Coffee': ['coffee','cafe','espresso','latte','cappuccino'],
-        'Places': ['park','museum','beach','city','trip','travel'],
-        'Books': ['book','novel','literature'],
-        'Movies': ['movie','film','series'],
-        'People': ['friend','person','colleague'],
-        'Sports': ['tennis','game','gym','exercise','workout'],
-      };
+  // Initialize confidence for all categories
+  const confidence = {};
+  ALL_CATEGORIES.forEach(cat => confidence[cat] = 0);
 
-      for (const [cat, keys] of Object.entries(keywords)) {
-        if (keys.some(k => lowerText.includes(k))) { categoryCache[lowerText] = cat; return cat; }
-      }
-
-      categoryCache[lowerText] = 'Other';
-      return 'Other';
-    }
-
-    // --- Main App ---
-    function BinaryApp() {
-      const [items, setItems] = useState([]);
-      const [inputText, setInputText] = useState('');
-      const [selectedCategory, setSelectedCategory] = useState('All');
-      const [editingComment, setEditingComment] = useState(null);
-      const [commentText, setCommentText] = useState('');
-      const [userLocation, setUserLocation] = useState({lat:null, lng:null});
-      const [isLoading, setIsLoading] = useState(true);
-
-      // Load items + get geolocation
-      useEffect(() => {
-        const stored = localStorage.getItem('binaryItems');
-        if (stored) setItems(JSON.parse(stored));
-        setIsLoading(false);
-
-        navigator.geolocation.getCurrentPosition(
-          pos => setUserLocation({lat: pos.coords.latitude, lng: pos.coords.longitude}),
-          err => console.warn('Location access denied:', err)
-        );
-      }, []);
-
-      const saveItems = (newItems) => {
-        setItems(newItems);
-        localStorage.setItem('binaryItems', JSON.stringify(newItems));
-      };
-
-      const addItem = async (rating) => {
-        if (!inputText.trim()) return;
-        const category = await detectCategorySmart(inputText, userLocation.lat, userLocation.lng);
-        const newItem = {
-          id: Date.now().toString(),
-          text: inputText.trim(),
-          rating,
-          category,
-          comment: '',
-          date: new Date().toLocaleDateString()
-        };
-        saveItems([newItem, ...items]);
-        setInputText('');
-      };
-
-      const updateCategory = (id, newCat) => {
-        const updated = items.map(i => i.id === id ? {...i, category: newCat} : i);
-        saveItems(updated);
-      };
-
-      const deleteItem = (id) => saveItems(items.filter(i => i.id !== id));
-
-      const startEditingComment = (item) => {
-        setEditingComment(item.id);
-        setCommentText(item.comment || '');
-      };
-
-      const saveComment = (id) => {
-        const updated = items.map(i => i.id === id ? {...i, comment: commentText.trim()} : i);
-        saveItems(updated);
-        setEditingComment(null);
-        setCommentText('');
-      };
-
-      const cancelEditingComment = () => {
-        setEditingComment(null);
-        setCommentText('');
-      };
-
-      const categories = ['All', ...new Set(items.map(i => i.category))].sort();
-      const filteredItems = selectedCategory === 'All' ? items : items.filter(i => i.category === selectedCategory);
-
-      const getRatingEmoji = (rating) => rating === 'like' ? '👍' : '👎';
-      const getRatingColor = (rating) => rating === 'like' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300';
-
-      if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
-          <div className="max-w-2xl mx-auto px-4 py-6">
-            <div className="text-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Binary</h1>
-              <p className="text-gray-600">Yes/no, that's all</p>
-            </div>
-
-            {/* Input + Buttons */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-              <input
-                type="text"
-                value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                placeholder="What did you experience?"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl mb-4 focus:border-purple-400 focus:outline-none"
-              />
-              <div className="flex gap-3">
-                <button onClick={() => addItem('like')} disabled={!inputText.trim()} className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
-                  <ThumbsUp /> Like
-                </button>
-                <button onClick={() => addItem('dislike')} disabled={!inputText.trim()} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
-                  <ThumbsDown /> Dislike
-                </button>
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            {items.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-lg p-4 mb-6 flex flex-wrap gap-2">
-                {categories.map(cat => (
-                  <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-lg font-medium ${selectedCategory===cat?'bg-purple-500 text-white':'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Items List */}
-            <div className="space-y-3">
-              {filteredItems.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-lg p-12 text-center text-gray-500">No items yet.</div>
-              ) : filteredItems.map(item => (
-                <div key={item.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
-                          {getRatingEmoji(item.rating)} {item.rating==='like'?'Liked':'Disliked'}
-                        </span>
-                        <select value={item.category} onChange={e => updateCategory(item.id, e.target.value)} className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700">
-                          {categories.filter(c => c!=='All').map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </div>
-                      <p className="text-gray-800 font-medium mb-1">{item.text}</p>
-                      <p className="text-sm text-gray-500">{item.date}</p>
-
-                      {editingComment===item.id ? (
-                        <div className="mt-3 space-y-2">
-                          <textarea value={commentText} onChange={e=>setCommentText(e.target.value)} className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-400 focus:outline-none resize-none" rows="3" autoFocus />
-                          <div className="flex gap-2">
-                            <button onClick={()=>saveComment(item.id)} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium">Save</button>
-                            <button onClick={cancelEditingComment} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium">Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          {item.comment && <div className="mt-2 p-3 bg-gray-50 rounded-lg"><p className="text-sm text-gray-700 italic">{item.comment}</p></div>}
-                          <button onClick={()=>startEditingComment(item)} className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium">
-                            <MessageSquare /> {item.comment ? 'Edit comment':'Add comment'}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    <button onClick={()=>deleteItem(item.id)} className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                      <Trash2 />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Stats */}
-            {items.length > 0 && (
-              <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-green-50 rounded-xl">
-                    <div className="text-3xl font-bold text-green-600">{items.filter(i=>i.rating==='like').length}</div>
-                    <div className="text-sm text-gray-600">Liked</div>
-                  </div>
-                  <div className="text-center p-4 bg-red-50 rounded-xl">
-                    <div className="text-3xl font-bold text-red-600">{items.filter(i=>i.rating==='dislike').length}</div>
-                    <div className="text-sm text-gray-600">Disliked</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </div>
-        </div>
+  // --------------------
+  // 1️⃣ Google Books API
+  // --------------------
+try {
+const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(text)}&maxResults=3`);
+const bookData = await bookRes.json();
+if (bookData.items && bookData.items.length > 0) {
+      const exact = bookData.items.find(b =>
+        b.volumeInfo.title.toLowerCase() === lower
       );
-    }
+      const exact = bookData.items.find(b => b.volumeInfo.title.toLowerCase() === lower);
+confidence.Books = exact ? 0.9 : 0.6;
+      if (isCapitalised) confidence.Books += 0.2;
+      if (isCapitalised) confidence.Books += 0.2; // capitalization boost ONLY for Books
+}
+  } catch (err) {
+    console.warn("Books API failed:", err);
+  }
+  } catch(err){ console.warn("Books API failed:", err); }
 
-    ReactDOM.render(<BinaryApp />, document.getElementById('root'));
-  </script>
-</body>
-</html>
+  // ---- 2️⃣ TMDB Movies ----
+  // --------------------
+  // 2️⃣ TMDB Movies API
+  // --------------------
+try {
+    const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=YOUR_TMDB_KEY&query=${encodeURIComponent(text)}`);
+    const tmdbKey = 'YOUR_TMDB_KEY';
+    const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
+const movieData = await movieRes.json();
+if (movieData.results && movieData.results.length > 0) {
+const exact = movieData.results.find(m => m.title.toLowerCase() === lower);
+confidence.Movies = exact ? 0.9 : 0.6;
+      if (isCapitalised) confidence.Movies += 0.2;
+      if (isCapitalised) confidence.Movies += 0.2; // capitalization boost ONLY for Movies
+}
+  } catch (err) {
+    console.warn("Movies API failed:", err);
+  }
+
+// --- Google Places detection ---
+if (window.google && window.google.maps) {
+  try {
+    const placeCat = await new Promise(resolve => {
+      const service = new google.maps.places.AutocompleteService();
+      service.getPlacePredictions(
+        { input: text, types: ['establishment'] },
+        (predictions, status) => {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length)
+            return resolve(null);
+
+          const first = predictions[0];
+          const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+          detailsService.getDetails({ placeId: first.place_id, fields: ['types', 'geometry'] },
+            (place, detailsStatus) => {
+              if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
+                let distKm = 999;
+                let nearbyBoost = 0;
+
+                if (userLat && userLng && place.geometry?.location) {
+                  const R = 6371; // Earth radius in km
+                  const dLat = (place.geometry.location.lat() - userLat) * Math.PI / 180;
+                  const dLng = (place.geometry.location.lng() - userLng) * Math.PI / 180;
+                  const a = Math.sin(dLat/2)**2 + Math.cos(userLat*Math.PI/180) * Math.cos(place.geometry.location.lat()*Math.PI/180) * Math.sin(dLng/2)**2;
+                  distKm = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+                  if (distKm < 5) nearbyBoost = 0.2; // within 5 km
+  } catch(err){ console.warn("Movies API failed:", err); }
+
+  // --------------------
+  // 3️⃣ Google Places API
+  // --------------------
+  if (window.google && window.google.maps) {
+    try {
+      const placeCat = await new Promise(resolve => {
+        const service = new google.maps.places.AutocompleteService();
+        service.getPlacePredictions({ input: text, types: ['establishment'] },
+          (predictions, status) => {
+            if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions?.length)
+              return resolve(null);
+
+            const first = predictions[0];
+            const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+            detailsService.getDetails({ placeId: first.place_id, fields: ['types','geometry'] },
+              (place, detailsStatus) => {
+                if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place?.types) {
+                  let nearbyBoost = 0;
+                  let distKm = 999;
+
+                  if (userLat && userLng && place.geometry?.location) {
+                    distKm = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
+                    if (distKm < 5) nearbyBoost = 0.2;
+                  }
+
+                  // Map Google types to categories
+                  const typeMap = {
+                    cafe: 'Coffee',
+                    bar: 'Beverages',
+                    pub: 'Beverages',
+                    restaurant: 'Food',
+                  };
+                  let baseCat = null;
+                  for (let t of place.types) {
+                    if (typeMap[t]) { baseCat = typeMap[t]; break; }
+                  }
+                  if (!baseCat && place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','establishment'].includes(t)))
+                    baseCat = 'Places';
+
+                  if (baseCat) confidence[baseCat] = Math.max(confidence[baseCat], 0.6 + nearbyBoost);
+}
+                resolve(null);
+              });
+          });
+      });
+    } catch(err){ console.warn("Places detection failed:", err); }
+  }
+
+                let baseCat = null;
+                if (place.types.includes('cafe')) baseCat = 'Coffee';
+                else if (place.types.includes('bar') || place.types.includes('pub')) baseCat = 'Beverages';
+                else if (place.types.includes('restaurant')) baseCat = 'Food';
+                else if (place.types.some(t => ['park','museum','tourist_attraction','point_of_interest','establishment'].includes(t)))
+                  baseCat = 'Places';
+
+                if (baseCat) {
+                  resolve({ category: baseCat, confidence: 0.6 + nearbyBoost });
+                } else {
+                  resolve(null);
+                }
+              } else resolve(null);
+            }
+          );
+        }
+      );
+    });
+
+    if (placeCat) return placeCat.category;
+  } catch (err) {
+    console.warn('Places detection failed', err);
+  // --------------------
+  // 4️⃣ Keyword fallback
+  // --------------------
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(k => lower.includes(k))) {
+      confidence[cat] = Math.max(confidence[cat], 0.5);
+    }
+}
+}
+    
+ // --- Fallback keyword check for generic foods ---
+const foodKeywords = ["restaurant", "cheese", "ramen", "blueberry", "coffee", "pizza", "bread", "fruit", "food", "snack"];
+if (foodKeywords.some(k => lower.includes(k)) && !confidence.Food) {
+  confidence.Food = 0.5;
+
+  // --------------------
+  // 5️⃣ Select final category
+  // --------------------
+  const sorted = Object.entries(confidence).sort((a,b) => b[1]-a[1]);
+  let [bestCat, bestScore] = sorted[0];
+  if (bestScore < 0.4) bestCat = 'Other';
+  const result = { category: bestCat, confidence: bestScore.toFixed(2), confidenceMap: confidence };
+
+  // Cache result
+  categoryCache[text] = result;
+  return result;
+}
+
+// === Main App ===
