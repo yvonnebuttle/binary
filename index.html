@@ -145,9 +145,18 @@ async function detectCategory(inputText, userLat, userLng) {
   const scores = {};
   ALL_CATEGORIES.forEach(cat => scores[cat] = 0);
 
-  // 1️⃣ Keyword matching (fast, reliable baseline)
+  // 1️⃣ Keyword matching (HIGH PRIORITY - if strong match, return immediately)
   for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (config.exact?.some(k => lower.includes(k))) {
+    if (config.exact?.some(k => {
+      const words = lower.split(/\s+/);
+      return words.includes(k) || lower === k;
+    })) {
+      // Strong keyword match - use this immediately for non-ambiguous cases
+      if (['Cheese', 'Sports', 'Dates', 'Entertainment'].includes(category)) {
+        categoryCache[text] = category;
+        saveCache();
+        return category;
+      }
       scores[category] = Math.max(scores[category], config.score);
     }
     if (config.partial?.some(k => lower.includes(k))) {
