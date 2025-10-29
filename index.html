@@ -1,106 +1,372 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ThumbsUp, ThumbsDown, Mic, List, Trash2, Filter, MessageSquare } from 'lucide-react';
-import { categories } from './categories';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Binary">
+    <title>Binary</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script 
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBNjg2ZqtsUmoXcMq-guhJAPwY9lIUNPkI&libraries=places"
+  async defer>
+</script>
+</head>
+<body>
+    <div id="root"></div>
+    
+<script type="text/babel">
+const { useState, useEffect } = React;
 
-export default function LifeRatingTracker() {
-  const [items, setItems] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(true);
-  const [editingComment, setEditingComment] = useState(null);
-  const [commentText, setCommentText] = useState('');
+// === SVG icons ===
+const ThumbsUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>;
+const ThumbsDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>;
+const Mic = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>;
+const List = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>;
+const Trash2 = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
+const Filter = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
+const MessageSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
 
-  // Preprocess categories for faster detection
-  const categoryKeywordsMap = useMemo(() => {
-    const map = {};
-    for (const [cat, keywords] of Object.entries(categories)) {
-      map[cat] = new Set(keywords.map(k => k.toLowerCase()));
+// === Master category list ===
+const ALL_CATEGORIES = [
+  'Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies',
+  'Cheese', 'Dates', 'People', 'Sports', 'Entertainment', 'Things', 'Other'
+];
+
+// Cache for category detection
+let categoryCache = {};
+try {
+  const storedCache = localStorage.getItem("categoryCache");
+  if (storedCache) categoryCache = JSON.parse(storedCache);
+} catch(err){ console.warn(err); }
+
+function saveCache() {
+  try { localStorage.setItem("categoryCache", JSON.stringify(categoryCache)); }
+  catch(err){ console.warn(err); }
+}
+
+// Enhanced keyword patterns with specificity
+const CATEGORY_KEYWORDS = {
+  Cheese: {
+    exact: ["cheese","cheddar","brie","gouda","mozzarella","parmesan","feta","camembert","gruyere","manchego","pecorino","ricotta","stilton","roquefort","gorgonzola","emmental","havarti","provolone"],
+    score: 0.8
+  },
+  Coffee: {
+    exact: ["coffee","cafe","latte","espresso","cappuccino","americano","macchiato","mocha","flat white","cortado","affogato"],
+    partial: ["starbucks","costa","cafe nero","pret"],
+    score: 0.7
+  },
+  Beverages: {
+    exact: ["bar","pub","cocktail","brewery","beer","wine","gin","vodka","whiskey","rum","tequila","ale","lager","cider","spirits","champagne","prosecco"],
+    partial: ["taproom","brewpub","tavern","lounge"],
+    score: 0.7
+  },
+  Food: {
+    exact: ["restaurant","ramen","pizza","burger","pasta","sushi","taco","curry","noodles","sandwich","steak","chicken","seafood","bakery","diner","bistro"],
+    partial: ["cuisine","eatery","grill","kitchen"],
+    score: 0.6
+  },
+  Places: {
+    exact: ["museum","park","beach","monument","gallery","plaza","square","garden","island","mountain","lake","resort","castle","palace","temple","cathedral"],
+    partial: ["tourist","attraction","landmark","historic"],
+    score: 0.5
+  },
+  Books: {
+    exact: ["novel","memoir","biography","poetry","textbook"],
+    partial: ["author","reading","literature"],
+    score: 0.6
+  },
+  Movies: {
+    exact: ["film","cinema","documentary","series","episode"],
+    partial: ["actor","director","netflix","disney"],
+    score: 0.5
+  },
+  Things: {
+    exact: ["shoes","bike","sneakers","jacket","laptop","bag","phone","watch","headphones","camera","tablet","keyboard","backpack","suitcase","umbrella"],
+    score: 0.6
+  },
+  Sports: {
+    exact: ["football","soccer","basketball","tennis","cricket","rugby","baseball","hockey","golf","swimming","match","championship","tournament","surfing","skiing","snowboarding","skateboarding","climbing","hiking","running","cycling","yoga","pilates","boxing","wrestling","martial arts","karate","judo","gymnastics","athletics","track","field"],
+    score: 0.7
+  },
+  Dates: {
+    exact: ["date","dating","romantic","anniversary","valentine","proposal","engagement","wedding","relationship","boyfriend","girlfriend","partner","spouse"],
+    score: 0.7
+  },
+  People: {
+    exact: ["person","friend","colleague","coworker","manager","boss","teacher","professor","doctor","nurse","artist","musician","celebrity","politician","athlete","neighbor","roommate","classmate"],
+    score: 0.6
+  },
+  Entertainment: {
+    exact: ["concert","festival","show","performance","theater","theatre","comedy","stand-up","magic","circus","exhibition","gig","club","nightclub","disco","rave","party","event"],
+    score: 0.6
+  }
+};
+
+// Helper: wait for Google Maps API
+function waitForGoogleMaps() {
+  return new Promise(resolve => {
+    if (window.google && window.google.maps) return resolve();
+    const interval = setInterval(() => {
+      if (window.google && window.google.maps) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 100);
+  });
+}
+
+// Helper: compute distance in km
+function distanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat/2)**2 +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// === Smart category detection with popularity & proximity ===
+async function detectCategory(inputText, userLat, userLng) {
+  const text = inputText.trim();
+  if (!text) return 'Other';
+
+  const lower = text.toLowerCase();
+  
+  // Check cache first
+  if (categoryCache[text]) return categoryCache[text];
+
+  // Initialize scores
+  const scores = {};
+  ALL_CATEGORIES.forEach(cat => scores[cat] = 0);
+
+  // 1️⃣ Keyword matching (fast, reliable baseline)
+  for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (config.exact?.some(k => lower.includes(k))) {
+      scores[category] = Math.max(scores[category], config.score);
     }
-    return map;
-  }, []);
-
-  // Load items from localStorage
-  useEffect(() => {
-    try {
-      const keys = Object.keys(localStorage).filter(k => k.startsWith('item:'));
-      const loadedItems = keys.map(k => JSON.parse(localStorage.getItem(k)));
-      setItems(loadedItems.sort((a, b) => b.timestamp - a.timestamp));
-    } catch (error) {
-      console.error('Error loading items:', error);
+    if (config.partial?.some(k => lower.includes(k))) {
+      scores[category] = Math.max(scores[category], config.score * 0.7);
     }
-    setIsLoading(false);
-  }, []);
+  }
 
-  // Detect category based on keywords
-  const detectCategory = (text) => {
-    const lower = text.toLowerCase();
-    for (const [cat, keywordsSet] of Object.entries(categoryKeywordsMap)) {
-      for (const key of keywordsSet) {
-        if (lower.includes(key)) return cat;
+  // 2️⃣ Google Books API (popularity weighted)
+  try {
+    const bookRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(text)}&maxResults=5`);
+    const bookData = await bookRes.json();
+    
+    if (bookData.items?.length) {
+      const bestMatch = bookData.items[0];
+      const title = bestMatch.volumeInfo.title?.toLowerCase() || '';
+      const titleMatch = title === lower || title.includes(lower);
+      
+      // Score based on match quality and popularity
+      const ratingCount = bestMatch.volumeInfo.ratingsCount || 0;
+      const avgRating = bestMatch.volumeInfo.averageRating || 0;
+      const popularity = Math.min((ratingCount / 100) * avgRating, 10) / 10;
+      
+      if (titleMatch) {
+        scores.Books = Math.max(scores.Books, 0.7 + (popularity * 0.2));
+      } else if (bookData.items.length >= 3) {
+        scores.Books = Math.max(scores.Books, 0.4 + (popularity * 0.1));
       }
     }
-    return 'Other';
+  } catch(err){ console.warn("Books API failed:", err); }
+
+  // 3️⃣ TMDB Movies API (popularity weighted, but lower than books)
+  try {
+    const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8';
+    const movieRes = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`
+    );
+    const movieData = await movieRes.json();
+    
+    if (movieData.results?.length) {
+      const bestMatch = movieData.results[0];
+      const title = bestMatch.title?.toLowerCase() || '';
+      const titleMatch = title === lower || title.includes(lower);
+      
+      // Movies get slightly lower base score than books
+      const popularity = Math.min(bestMatch.popularity / 100, 1);
+      
+      if (titleMatch) {
+        scores.Movies = Math.max(scores.Movies, 0.6 + (popularity * 0.2));
+      } else if (movieData.results.length >= 3) {
+        scores.Movies = Math.max(scores.Movies, 0.35 + (popularity * 0.1));
+      }
+    }
+  } catch(err){ console.warn("Movies API failed:", err); }
+
+  // 4️⃣ Google Places API (proximity heavily weighted for LOCAL places only)
+  try {
+    await waitForGoogleMaps();
+    if (window.google?.maps) {
+      const service = new google.maps.places.AutocompleteService();
+
+      const predictions = await new Promise(resolve => {
+        service.getPlacePredictions({ input: text }, (preds, status) => {
+          resolve(status === google.maps.places.PlacesServiceStatus.OK ? preds?.slice(0, 3) : []);
+        });
+      });
+
+      if (predictions?.length) {
+        const detailsService = new google.maps.places.PlacesService(document.createElement('div'));
+        
+        const placeResults = await Promise.all(predictions.map(p => new Promise(res => {
+          detailsService.getDetails({ 
+            placeId: p.place_id, 
+            fields: ['types', 'geometry', 'user_ratings_total', 'rating', 'name']
+          }, place => res(place));
+        })));
+
+        for (const place of placeResults) {
+          if (!place?.types) continue;
+
+          let distance = Infinity;
+          let proximityBoost = 0;
+          
+          // Check if this is a major place (city, country, famous landmark)
+          const isMajorPlace = place.types.some(t => 
+            ['locality', 'country', 'administrative_area_level_1', 'natural_feature', 
+             'continent', 'archipelago', 'colloquial_area'].includes(t)
+          );
+          
+          if (userLat && userLng && place.geometry?.location) {
+            distance = distanceKm(userLat, userLng, place.geometry.location.lat(), place.geometry.location.lng());
+            
+            // Only apply proximity boost for LOCAL businesses, not major places
+            if (!isMajorPlace) {
+              if (distance < 1) proximityBoost = 0.5;
+              else if (distance < 5) proximityBoost = 0.3;
+              else if (distance < 20) proximityBoost = 0.15;
+            }
+          }
+
+          // Popularity from reviews
+          const reviewCount = place.user_ratings_total || 0;
+          const avgRating = place.rating || 0;
+          const popularity = Math.min((reviewCount / 500) * (avgRating / 5), 1);
+
+          // Name match bonus
+          const nameMatch = place.name?.toLowerCase().includes(lower) ? 0.2 : 0;
+
+          // Type mapping with base scores
+          const typeMap = {
+            cafe: { cat: 'Coffee', base: 0.7 },
+            bar: { cat: 'Beverages', base: 0.7 },
+            night_club: { cat: 'Beverages', base: 0.7 },
+            restaurant: { cat: 'Food', base: 0.65 },
+            meal_takeaway: { cat: 'Food', base: 0.6 },
+            food: { cat: 'Food', base: 0.6 },
+            museum: { cat: 'Places', base: 0.7 },
+            park: { cat: 'Places', base: 0.7 },
+            tourist_attraction: { cat: 'Places', base: 0.7 },
+            natural_feature: { cat: 'Places', base: 0.75 },
+            locality: { cat: 'Places', base: 0.8 },      // Cities get HIGH base score
+            country: { cat: 'Places', base: 0.85 },       // Countries get HIGHEST score
+            administrative_area_level_1: { cat: 'Places', base: 0.75 }, // States/regions
+            continent: { cat: 'Places', base: 0.85 },
+            archipelago: { cat: 'Places', base: 0.75 },
+            colloquial_area: { cat: 'Places', base: 0.7 }
+          };
+
+          for (const type of place.types) {
+            const mapping = typeMap[type];
+            if (mapping) {
+              const score = mapping.base + proximityBoost + (popularity * 0.1) + nameMatch;
+              scores[mapping.cat] = Math.max(scores[mapping.cat], score);
+            }
+          }
+        }
+      }
+    }
+  } catch(err){ console.warn("Places detection failed:", err); }
+
+  // 5️⃣ Select best category
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  let [bestCat, bestScore] = sorted[0];
+  
+  // Require minimum confidence
+  if (bestScore < 0.3) bestCat = 'Other';
+
+  categoryCache[text] = bestCat;
+  saveCache();
+
+  return bestCat;
+}
+
+// === Main App ===
+function BinaryApp() {
+  const [items, setItems] = React.useState([]);
+  const [inputText, setInputText] = React.useState('');
+  const [selectedCategory, setSelectedCategory] = React.useState('All');
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [editingComment, setEditingComment] = React.useState(null);
+  const [commentText, setCommentText] = React.useState('');
+  const [isProcessing, setIsProcessing] = React.useState(false);
+
+  React.useEffect(() => {
+    const stored = localStorage.getItem('binaryItems');
+    if (stored) setItems(JSON.parse(stored));
+    setIsLoading(false);
+
+    navigator.geolocation.getCurrentPosition(
+      pos => { window.userLat = pos.coords.latitude; window.userLng = pos.coords.longitude; },
+      err => console.warn('Location denied:', err)
+    );
+  }, []);
+
+  const saveItems = (newItems) => {
+    setItems(newItems);
+    localStorage.setItem('binaryItems', JSON.stringify(newItems));
   };
 
-  // Add new item
-  const addItem = (rating) => {
-    if (!inputText.trim()) return;
-
-    const newItem = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      rating,
-      category: detectCategory(inputText),
-      timestamp: Date.now(),
-      date: new Date().toLocaleDateString()
-    };
-
-    localStorage.setItem(`item:${newItem.id}`, JSON.stringify(newItem));
-    setItems(prev => [newItem, ...prev]);
-    setInputText('');
+  const addItem = async (rating) => {
+    if (!inputText.trim() || isProcessing) return;
+    
+    setIsProcessing(true);
+    try {
+      const category = await detectCategory(inputText, window.userLat, window.userLng);
+      const newItem = {
+        id: Date.now().toString(),
+        text: inputText.trim(),
+        rating,
+        category,
+        timestamp: Date.now(),
+        date: new Date().toLocaleDateString(),
+      };
+      saveItems([newItem, ...items]);
+      setInputText('');
+    } catch (err) {
+      console.error('Failed to add item:', err);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  // Delete item
-  const deleteItem = (id) => {
-    localStorage.removeItem(`item:${id}`);
-    setItems(prev => prev.filter(item => item.id !== id));
+  const updateCategory = (id, newCat) => {
+    saveItems(items.map(item => item.id === id ? { ...item, category: newCat } : item));
   };
 
-  // Comment editing
-  const startEditingComment = (item) => {
-    setEditingComment(item.id);
-    setCommentText(item.comment || '');
+  const deleteItem = (id) => saveItems(items.filter(item => item.id !== id));
+  const startEditingComment = (item) => { setEditingComment(item.id); setCommentText(item.comment || ''); };
+  const saveComment = (id) => { 
+    saveItems(items.map(i => i.id === id ? { ...i, comment: commentText.trim() } : i));
+    setEditingComment(null); setCommentText('');
   };
+  const cancelEditingComment = () => { setEditingComment(null); setCommentText(''); };
 
-  const saveComment = (id) => {
-    const updatedItem = items.find(item => item.id === id);
-    if (!updatedItem) return;
-
-    updatedItem.comment = commentText;
-    localStorage.setItem(`item:${id}`, JSON.stringify(updatedItem));
-    setItems(prev => prev.map(item => item.id === id ? updatedItem : item));
-    cancelEditingComment();
-  };
-
-  const cancelEditingComment = () => {
-    setEditingComment(null);
-    setCommentText('');
-  };
-
-  // Filtered items
-  const categoryList = ['All', ...new Set(items.map(item => item.category))].sort();
-  const filteredItems = selectedCategory === 'All' ? items : items.filter(item => item.category === selectedCategory);
-
+  const categories = ['All', ...ALL_CATEGORIES];
+  const filteredItems = selectedCategory === 'All' ? items : items.filter(i => i.category === selectedCategory);
   const getRatingEmoji = (rating) => rating === 'like' ? '👍' : '👎';
   const getRatingColor = (rating) => rating === 'like' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300';
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center text-gray-600">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
@@ -112,7 +378,7 @@ export default function LifeRatingTracker() {
           <p className="text-gray-600">Yes/no, that's all</p>
         </div>
 
-        {/* Input Section */}
+        {/* Input */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="relative flex-1">
@@ -120,53 +386,50 @@ export default function LifeRatingTracker() {
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="What did you experience? (e.g., 'Tried aged cheddar')"
+                placeholder="What did you experience?"
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none"
+                onKeyPress={(e) => e.key === 'Enter' && inputText.trim() && !isProcessing && document.getElementById('like-btn').focus()}
+                disabled={isProcessing}
               />
-              <Mic className="absolute right-3 top-3.5 text-gray-400 w-5 h-5" />
             </div>
+          </div>
+
+          <div className="text-xs text-gray-500 mb-3 text-center">
+            Tap the microphone icon on your keyboard to use voice input
           </div>
 
           <div className="flex gap-3">
             <button
+              id="like-btn"
               onClick={() => addItem('like')}
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || isProcessing}
               className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
             >
-              <ThumbsUp className="w-5 h-5" />
-              Like
+              <ThumbsUp />
+              {isProcessing ? 'Processing...' : 'Like'}
             </button>
             <button
               onClick={() => addItem('dislike')}
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || isProcessing}
               className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-colors"
             >
-              <ThumbsDown className="w-5 h-5" />
-              Dislike
+              <ThumbsDown />
+              {isProcessing ? 'Processing...' : 'Dislike'}
             </button>
           </div>
         </div>
 
-        {/* Category Filter */}
+        {/* Filter */}
         {items.length > 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <span className="font-semibold text-gray-700">Filter by category:</span>
-            </div>
+            <div className="flex items-center gap-2 mb-3"><Filter /><span className="font-semibold text-gray-700">Filter by category:</span></div>
             <div className="flex flex-wrap gap-2">
-              {categoryList.map(cat => (
+              {categories.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    selectedCategory === cat
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {cat}
-                </button>
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === cat ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                >{cat}</button>
               ))}
             </div>
           </div>
@@ -176,33 +439,31 @@ export default function LifeRatingTracker() {
         <div className="space-y-3">
           {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-              <List className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">
-                {items.length === 0 
-                  ? "No ratings yet. Start by rating your first experience!"
-                  : "No items in this category yet."}
-              </p>
+              <div className="flex justify-center mb-4"><List /></div>
+              <p className="text-gray-500">{items.length === 0 ? "No ratings yet." : "No items in this category yet."}</p>
             </div>
           ) : (
             filteredItems.map(item => (
-              <div
-                key={item.id}
-                className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow"
-              >
+              <div key={item.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
                         {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'}
                       </span>
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                        {item.category}
-                      </span>
+
+                      <select
+                        value={item.category}
+                        onChange={(e) => updateCategory(item.id, e.target.value)}
+                        className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700"
+                      >
+                        {ALL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      </select>
                     </div>
+
                     <p className="text-gray-800 font-medium mb-1">{item.text}</p>
                     <p className="text-sm text-gray-500">{item.date}</p>
 
-                    {/* Comment Section */}
                     {editingComment === item.id ? (
                       <div className="mt-3 space-y-2">
                         <textarea
@@ -214,18 +475,8 @@ export default function LifeRatingTracker() {
                           autoFocus
                         />
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => saveComment(item.id)}
-                            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={cancelEditingComment}
-                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Cancel
-                          </button>
+                          <button onClick={() => saveComment(item.id)} className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors">Save</button>
+                          <button onClick={cancelEditingComment} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">Cancel</button>
                         </div>
                       </div>
                     ) : (
@@ -235,21 +486,16 @@ export default function LifeRatingTracker() {
                             <p className="text-sm text-gray-700 italic">{item.comment}</p>
                           </div>
                         )}
-                        <button
-                          onClick={() => startEditingComment(item)}
-                          className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium"
-                        >
-                          <MessageSquare className="w-4 h-4" />
+                        <button onClick={() => startEditingComment(item)} className="mt-2 flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium">
+                          <MessageSquare />
                           {item.comment ? 'Edit comment' : 'Add comment'}
                         </button>
                       </>
                     )}
                   </div>
-                  <button
-                    onClick={() => deleteItem(item.id)}
-                    className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-5 h-5" />
+
+                  <button onClick={() => deleteItem(item.id)} className="ml-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 />
                   </button>
                 </div>
               </div>
@@ -263,15 +509,11 @@ export default function LifeRatingTracker() {
             <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-4 bg-green-50 rounded-xl">
-                <div className="text-3xl font-bold text-green-600">
-                  {items.filter(i => i.rating === 'like').length}
-                </div>
+                <div className="text-3xl font-bold text-green-600">{items.filter(i => i.rating === 'like').length}</div>
                 <div className="text-sm text-gray-600">Liked</div>
               </div>
               <div className="text-center p-4 bg-red-50 rounded-xl">
-                <div className="text-3xl font-bold text-red-600">
-                  {items.filter(i => i.rating === 'dislike').length}
-                </div>
+                <div className="text-3xl font-bold text-red-600">{items.filter(i => i.rating === 'dislike').length}</div>
                 <div className="text-sm text-gray-600">Disliked</div>
               </div>
             </div>
@@ -282,3 +524,8 @@ export default function LifeRatingTracker() {
     </div>
   );
 }
+
+        ReactDOM.render(<BinaryApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
