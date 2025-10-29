@@ -101,7 +101,7 @@ async function detectCategory(inputText, userLat, userLng) {
   // 2️⃣ TMDB Movies API
   // --------------------
   try {
-    const tmdbKey = 'YOUR_TMDB_KEY';
+    const tmdbKey = '559458ec6b7148bf5d8a39f7224a2fb8';
     const movieRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(text)}`);
     const movieData = await movieRes.json();
     if (movieData.results && movieData.results.length > 0) {
