@@ -34,7 +34,7 @@ const MessageSquare = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" h
 // === Master category list ===
 const ALL_CATEGORIES = [
   'Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies',
-  'Cheese', 'Dates', 'People', 'Sports', 'Entertainment', 'Other'
+  'Cheese', 'Dates', 'People', 'Sports', 'Entertainment', 'Things', 'Other'
 ];
 
 // === Smart category detection ===
@@ -50,12 +50,6 @@ function saveCache() {
   try { localStorage.setItem("categoryCache", JSON.stringify(categoryCache)); }
   catch(err){ console.warn(err); }
 }
-
-// After computing result
-categoryCache[text] = result;
-saveCache();
-
-const ALL_CATEGORIES = ['Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies', 'Things', 'Other'];
 
 // Keyword fallbacks for categories
 const CATEGORY_KEYWORDS = {
@@ -122,7 +116,7 @@ async function detectCategory(inputText, userLat, userLng) {
   // --------------------
   if (window.google && window.google.maps) {
     try {
-      const placeCat = await new Promise(resolve => {
+      await new Promise(resolve => {
         const service = new google.maps.places.AutocompleteService();
         service.getPlacePredictions({ input: text, types: ['establishment'] },
           (predictions, status) => {
