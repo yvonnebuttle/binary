@@ -404,22 +404,34 @@ function BinaryApp() {
   };
 
   // Load user's items
-  const loadUserItems = async (userId) => {
-    try {
-      const snapshot = await db.collection('items')
-        .where('userId', '==', userId)
-        .orderBy('timestamp', 'desc')
-        .get();
-      
-      const loadedItems = snapshot.docs.map(doc => ({
+  // Load user's items
+const loadUserItems = async (userId) => {
+  console.log('Loading items for user:', userId);
+  try {
+    const snapshot = await db.collection('items')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+    
+    console.log('Snapshot size:', snapshot.size);
+    console.log('Documents:', snapshot.docs.length);
+    
+    const loadedItems = snapshot.docs.map(doc => {
+      console.log('Item data:', doc.id, doc.data());
+      return {
         id: doc.id,
         ...doc.data()
-      }));
-      setItems(loadedItems);
-    } catch (error) {
-      console.error('Error loading items:', error);
-    }
-  };
+      };
+    });
+    
+    console.log('Loaded items:', loadedItems);
+    setItems(loadedItems);
+  } catch (error) {
+    console.error('Error loading items:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+  }
+};
 
   // Load public items
   const loadPublicItems = async () => {
