@@ -524,7 +524,42 @@ function BinaryApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [message, setMessage] = useState(null);
-  // Auth + Load Data
+  // === CORRECT: showMessage HERE ===
+  const showMessage = (txt, type = 'success') => {
+    setMessage({ txt, type });
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  // === CORRECT: signInWithGoogle HERE ===
+  const signInWithGoogle = async () => {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      if (isMobile) {
+        await auth.signInWithRedirect(provider);
+      } else {
+        const result = await auth.signInWithPopup(provider);
+        await db.collection('users').doc(result.user.uid).set({
+          displayName: result.user.displayName,
+          email: result.user.email,
+          photoURL: result.user.photoURL,
+          lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        showMessage('Welcome back!');
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      showMessage('Failed to sign in.', 'error');
+    }
+  };
+
+  // === Your search debounce useEffect (now safe) ===
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchQuery.trim()) searchUsers(searchQuery);
+      else setSearchResults([]);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);// Auth + Load Data
   useEffect(() => {
   const unsub = auth.onAuthStateChanged(async u => {
     setUser(u);
