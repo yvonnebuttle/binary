@@ -180,6 +180,9 @@ function saveCache() {
     "film","cinema","documentary","series","episode","the godfather","casablanca","l.a. confidential","seven samurai","parasite","schindler's list","the shawshank redemption","the dark knight","12 angry men","the godfather part ii","pulp fiction","forrest gump","the good the bad and the ugly","the lord of the rings the return of the king","fight club","inception","goodfellas","star wars a new hope","the matrix","se7en","city of god","it's a wonderful life","the silence of the lambs","saving private ryan","life is beautiful","spirited away","interstellar","the green mile","singin' in the rain","the pianist","the lion king","back to the future","american history x","gladiator","the usual suspects","leon the professional","the prestige","memento","whiplash","the intouchables","alien","once upon a time in the west","rear window","psycho","the shining","raiders of the lost ark","toy story","jaws","clockwork orange","the empire strikes back","amadeus","the sting","braveheart","good will hunting","la la land","moonlight","get out","birdman","mad max fury road","spotlight","room","the revenant","the big short","12 years a slave","argo","gravity","her","the wolf of wall street","dallas buyers club","the king's speech","black swan","the social network","the hurt locker","slumdog millionaire","no country for old men","the departed","brokeback mountain","crash","million dollar baby","finding nemo","lord of the rings the fellowship of the ring","titanic","jurassic park", "actor","director","netflix","disney"
   ]
 };
+    // === Mobile detection (add right after the other consts, e.g. after ALL_CATEGORIES) ===
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
 function waitForGoogleMaps() {
   return new Promise(resolve => {
     if (window.google && window.google.maps) return resolve();
@@ -528,6 +531,8 @@ function BinaryApp() {
       }
       setIsLoading(false);
     });
+      // Process any pending redirect result (mobile)
+  handleRedirectResult();
     return unsub;
   }, []);
   useEffect(() => {
@@ -867,20 +872,52 @@ function BinaryApp() {
   );
 }
 // Sign In / Out
+// === Hybrid sign-in: popup on desktop, redirect on mobile ===
 const signInWithGoogle = async () => {
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
-    const result = await auth.signInWithPopup(provider);
-    await db.collection('users').doc(result.user.uid).set({
-      displayName: result.user.displayName,
-      email: result.user.email,
-      photoURL: result.user.photoURL,
-      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    showMessage('Welcome back!');
+
+    if (isMobile) {
+      // Mobile → redirect (more reliable on iOS Safari)
+      await auth.signInWithRedirect(provider);
+    } else {
+      // Desktop → fast popup
+      const result = await auth.signInWithPopup(provider);
+      await db.collection('users').doc(result.user.uid).set(
+        {
+          displayName: result.user.displayName,
+          email: result.user.email,
+          photoURL: result.user.photoURL,
+          lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+      showMessage('Welcome back!');
+    }
   } catch (error) {
     console.error('Sign in error:', error);
     showMessage('Failed to sign in.', 'error');
+  }
+};
+    // === Handle the result after a redirect (mobile) ===
+const handleRedirectResult = async () => {
+  try {
+    const result = await auth.getRedirectResult();
+    if (result.user) {
+      await db.collection('users').doc(result.user.uid).set(
+        {
+          displayName: result.user.displayName,
+          email: result.user.email,
+          photoURL: result.user.photoURL,
+          lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+      showMessage('Welcome back!');
+    }
+  } catch (error) {
+    console.error('Redirect sign-in error:', error);
+    // Do NOT show a toast here – the user is already on the login screen
   }
 };
 const signOut = async () => {
