@@ -218,41 +218,63 @@ async function detectCategory(inputText, userLat, userLng) {
 
   const lower = text.toLowerCase();
 
-  // ---- 1. PROXIMITY CHECK (unchanged) ----
-  if (window.google?.maps && userLat && userLng) {
-    try {
-      await waitForGoogleMaps();
-      const service = new google.maps.places.PlacesService(document.createElement('div'));
-      const request = {
-        query: text,
-        fields: ['name', 'geometry', 'types'],
-        location: new google.maps.LatLng(userLat, userLng),
-        radius: 2000
-      };
+// ---- 1. PROXIMITY CHECK (SIMPLE TEXT SEARCH + DISTANCE FILTER) ----
+if (window.google?.maps && userLat && userLng) {
+  try {
+    await waitForGoogleMaps();
+    const service = new google.maps.places.PlacesService(document.createElement('div'));
 
-      const results = await new Promise(resolve => {
-        service.textSearch(request, (res, status) => {
-          resolve(status === google.maps.places.PlacesServiceStatus.OK ? res || [] : []);
-        });
+    const request = {
+      query: text,                              // FULL input: "grogans" or "ate at grogans"
+      location: new google.maps.LatLng(userLat, userLng),
+      radius: 2000                              // Bias results to 2km
+    };
+
+    const results = await new Promise(resolve => {
+      service.textSearch(request, (res, status) => {
+        resolve(status === google.maps.places.PlacesServiceStatus.OK ? res || [] : []);
+      });
+    });
+
+    if (results.length > 0) {
+      // Sort by distance to user
+      results.sort((a, b) => {
+        const distA = distanceKm(userLat, userLng, a.geometry.location.lat(), a.geometry.location.lng());
+        const distB = distanceKm(userLat, userLng, b.geometry.location.lat(), b.geometry.location.lng());
+        return distA - distB;
       });
 
-      if (results.length) {
-        const place = results[0];
-        const dist = distanceKm(userLat, userLng,
-          place.geometry.location.lat(),
-          place.geometry.location.lng());
+      const closest = results[0];
+      const dist = distanceKm(userLat, userLng, closest.geometry.location.lat(), closest.geometry.location.lng());
 
-        if (dist <= 2) {
-          const types = place.types || [];
-          if (types.includes('restaurant') || types.includes('food')) return 'Food';
-          if (types.includes('cafe')) return 'Coffee';
-          if (types.includes('bar') || types.includes('night_club')) return 'Beverages';
-          if (types.some(t => ['museum','park','tourist_attraction','point_of_interest'].includes(t))) return 'Places';
+      if (dist <= 2) {  // ONLY categorize if < 2km
+        const types = closest.types || [];
+
+        // Expanded type mapping (your requested: pub, bar, restaurant, cafe, establishment, locality)
+        if (types.includes('restaurant') || types.includes('food') || types.includes('meal_takeaway')) {
+          return 'Food';
         }
+        if (types.includes('cafe') || types.includes('coffee_shop') || types.includes('locality')) {
+          return 'Coffee';
+        }
+        if (types.includes('bar') || 
+            types.includes('pub') || 
+            types.includes('night_club') || 
+            types.includes('establishment')) {
+          return 'Beverages';
+        }
+        if (types.some(t => ['museum', 'park', 'tourist_attraction', 'point_of_interest'].includes(t))) {
+          return 'Places';
+        }
+        // Optional: if no strong type but very close, trust proximity
+        // return 'Places';  // or skip to keywords
       }
-    } catch (e) { console.warn('Proximity error:', e); }
+    }
+  } catch (e) {
+    console.warn('Proximity error:', e);
   }
-
+}
+// → If no valid place < 2km, fall through to keyword matching (unchanged)
   // ---- 2. KEYWORD FALLBACK (IMPROVED) ----
   if (categoryCache[text]) return categoryCache[text];
 
