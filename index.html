@@ -525,22 +525,18 @@ function BinaryApp() {
   const [searchResults, setSearchResults] = useState([]);
   const [message, setMessage] = useState(null);
   // Auth + Load Data
-  useEffect(() => {
-  const unsub = auth.onAuthStateChanged(async u => {
-    setUser(u);
-    if (u) {
-      await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
-    }
-    setIsLoading(false);
+   useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async u => {
+      setUser(u);
+      if (u) {
+        await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+      }
+      setIsLoading(false);
 
-    // ← NOW IT WORKS – Firebase is fully ready
-    await handleRedirectResult();
-  });
+      // ← ONLY HERE: Firebase is fully initialized
+      await handleRedirectResult();
+    });
 
-  return unsub;
-}, []);
-      // Process any pending redirect result (mobile)
-  handleRedirectResult();
     return unsub;
   }, []);
   useEffect(() => {
