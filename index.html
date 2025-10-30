@@ -508,23 +508,6 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
     </div>
   );
 }
-    const showMessage = (txt, type = 'success') => {
-  setMessage({ txt, type });
-  setTimeout(() => setMessage(null), 3000);
-};
-
-const signOut = async () => {
-  try {
-    await auth.signOut();
-    setItems([]);
-    setPublicItems([]);
-    setFollowing([]);
-    setView('my');
-    showMessage('Signed out');
-  } catch (error) {
-    console.error('Sign out error:', error);
-  }
-};
 // === MAIN APP ===
 function BinaryApp() {
   const [user, setUser] = useState(null);
@@ -541,12 +524,25 @@ function BinaryApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [message, setMessage] = useState(null);
-  // === CORRECT: showMessage HERE ===
-  const showMessage = (txt, type = 'success') => {
-    setMessage({ txt, type });
-    setTimeout(() => setMessage(null), 3000);
-  };
 
+    // === CORRECT: showMessage & signOut INSIDE component ===
+      const showMessage = (txt, type = 'success') => {
+  setMessage({ txt, type });
+  setTimeout(() => setMessage(null), 3000);
+};
+
+const signOut = async () => {
+  try {
+    await auth.signOut();
+    setItems([]);
+    setPublicItems([]);
+    setFollowing([]);
+    setView('my');
+    showMessage('Signed out');
+  } catch (error) {
+    console.error('Sign out error:', error);
+  }
+};
   // === Yes CORRECT: signInWithGoogle HERE ===
   const signInWithGoogle = async () => {
     try {
@@ -859,9 +855,8 @@ useEffect(() => {
                 </button>
               )}
             </div>
-          ) : (
-            ) : (
-          filteredItems.map(itm => {
+) : (
+  filteredItems.map(itm => {
             const handleUpdate = updatedItem => {
               if (view === 'my') {
                 setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
