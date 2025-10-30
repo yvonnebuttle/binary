@@ -284,19 +284,19 @@ function BinaryApp() {
     }
   };
 
-  const followUser = async (userId) => {
-  if (following.includes(userId)) {
+  const followUser = async (currentUserId, targetUserId) => {
+  if (following.includes(targetUserId)) {
     showMessage("You're already following this user");
     return;
   }
 
   try {
-    await db.collection('follows').doc(`${user.uid}_${userId}`).set({
-      followerId: user.uid,
-      followingId: userId,
+    await db.collection('follows').doc(`${currentUserId}_follows_${targetUserId}`).set({
+      followerId: currentUserId,
+      followingId: targetUserId,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    setFollowing([...following, userId]);
+    setFollowing([...following, targetUserId]);
     showMessage('Now following!');
   } catch (error) {
     console.error('Error following user:', error);
@@ -304,15 +304,15 @@ function BinaryApp() {
   }
 };
 
-  const unfollowUser = async (userId) => {
-  if (!following.includes(userId)) {
+const unfollowUser = async (currentUserId, targetUserId) => {
+  if (!following.includes(targetUserId)) {
     showMessage("Not following this user");
     return;
   }
 
   try {
-    await db.collection('follows').doc(`${user.uid}_${userId}`).delete();
-    setFollowing(following.filter(id => id !== userId));
+    await db.collection('follows').doc(`${currentUserId}_follows_${targetUserId}`).delete();
+    setFollowing(following.filter(id => id !== targetUserId));
     showMessage('Unfollowed');
     if (view === 'public') loadPublicItems();
   } catch (error) {
@@ -518,30 +518,31 @@ function BinaryApp() {
                   <p className="text-center text-gray-500 py-8">Start typing to search for users</p>
                 )}
                 <div className="space-y-3">
-                  {searchResults.map(searchUser => (
-                    <div key={searchUser.id} className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-800">{searchUser.displayName}</p>
-                        <p className="text-sm text-gray-500">{searchUser.email}</p>
-                      </div>
-                      {following.includes(searchUser.id) ? (
-                        <button
-                          onClick={() => unfollowUser(searchUser.id)}
-                          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium flex items-center gap-2 transition-colors"
-                        >
-                          <UserMinus />
-                          Unfollow
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => followUser(searchUser.id)}
-                          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
-                        >
-                          <UserPlus />
-                          Follow
-                        </button>
-                      )}
-                    </div>
+                 {searchResults.map(searchUser => (
+  <div key={searchUser.id} className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
+    <div>
+      <p className="font-semibold text-gray-800">{searchUser.displayName}</p>
+      <p className="text-sm text-gray-500">{searchUser.email}</p>
+    </div>
+    {following.includes(searchUser.id) ? (
+      <button
+        onClick={() => unfollowUser(user.uid, searchUser.id)}
+        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium flex items-center gap-2 transition-colors"
+      >
+        <UserMinus />
+        Unfollow
+      </button>
+    ) : (
+      <button
+        onClick={() => followUser(user.uid, searchUser.id)}
+        className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+      >
+        <UserPlus />
+        Follow
+      </button>
+    )}
+  </div>
+))}
                   ))}
                 </div>
               </div>
