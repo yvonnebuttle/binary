@@ -721,27 +721,46 @@ useEffect(() => {
     showMessage('Unfollowed');
     if (view === 'public') loadPublicFeed();
   };
-  const addItem = async rating => {
-    if (!inputText.trim() || isProcessing) return;
-    setIsProcessing(true);
-    try {
-      const cat = await detectCategory(inputText);
-      const payload = {
-        text: inputText.trim(),
-        rating,
-        category: cat,
-        timestamp: Date.now(),
-        date: new Date().toLocaleDateString(),
-        userId: user.uid,
-        isPublic: true
-      };
-      const ref = await db.collection('items').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      setItems(prev => [{ id: ref.id, ...payload }, ...prev]);
-      setInputText('');
-      showMessage('Added!');
-    } catch (e) { console.error(e); showMessage('Error', 'error'); }
-    finally { setIsProcessing(false); }
-  };
+const addItem = async rating => {
+  if (!inputText.trim() || isProcessing) return;
+  setIsProcessing(true);
+  try {
+    // GET USER LOCATION
+    let userLat = null, userLng = null;
+    if (navigator.geolocation) {
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            maximumAge: 60000 // Cache for 1 minute
+          });
+        });
+        userLat = position.coords.latitude;
+        userLng = position.coords.longitude;
+      } catch (geoError) {
+        console.warn('Location unavailable:', geoError);
+      }
+    }
+
+    // PASS LOCATION TO detectCategory
+    const cat = await detectCategory(inputText, userLat, userLng);
+    
+    const payload = {
+      text: inputText.trim(),
+      rating,
+      category: cat,
+      timestamp: Date.now(),
+      date: new Date().toLocaleDateString(),
+      userId: user.uid,
+      isPublic: true
+    };
+    const ref = await db.collection('items').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    setItems(prev => [{ id: ref.id, ...payload }, ...prev]);
+    setInputText('');
+    showMessage('Added!');
+  } catch (e) { console.error(e); showMessage('Error', 'error'); }
+  finally { setIsProcessing(false); }
+};
   const deleteItem = async id => {
     await db.collection('items').doc(id).delete();
     setItems(prev => prev.filter(i => i.id !== id));
