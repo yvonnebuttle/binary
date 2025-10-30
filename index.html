@@ -518,7 +518,7 @@ const unfollowUser = async (currentUserId, targetUserId) => {
                   <p className="text-center text-gray-500 py-8">Start typing to search for users</p>
                 )}
                 <div className="space-y-3">
-                 {searchResults.map(searchUser => (
+                                {searchResults.map(searchUser => (
   <div key={searchUser.id} className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
     <div>
       <p className="font-semibold text-gray-800">{searchUser.displayName}</p>
