@@ -609,33 +609,35 @@ const saveUserToFirestore = async (user) => {
     }, 300);
     return () => clearTimeout(t);
   }, [searchQuery]);// Auth + Load Data
-    /* ---------- 1. Auth observer (once) ---------- */
+/* ---------- 1. Auth observer (once) ---------- */
 useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async u => {
-      setUser(u);
-      if (u) {
-        await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+  const unsub = auth.onAuthStateChanged(async u => {
+    setUser(u);
+    if (u) {
+      await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+    }
+    setIsLoading(false);
+
+    // iOS PWA: handle popup fallback
+    if (isIOS && isInStandaloneMode()) {
+      try {
+        const result = await auth.getRedirectResult();
+        if (result.user) {
+          await saveUserToFirestore(result.user);
+          showMessage('Signed in via popup!');
+        }
+      } catch (err) {
+        if (err.code !== 'auth/no-such-redirect-result') console.error(err);
       }
-      setIsLoading(false);
-// === Handle popup result on iOS PWA (in case of refresh) ===
-if (isIOS && isInStandaloneMode()) {
-  try {
-    const result = await auth.getRedirectResult();
-    if (result.user) {
-      await saveUserToFirestore(result.user);
-      showMessage('Signed in via popup!');
     }
-  } catch (err) {
-    // Ignore: getRedirectResult throws if no redirect
-    if (err.code !== 'auth/no-such-redirect-result') {
-      console.error('getRedirectResult error:', err);
-    }
-  }
-}
-    /* ---------- 2. Public feed reload ---------- */
-  useEffect(() => {
-    if (view === 'public' && user) loadPublicFeed();
-  }, [view, following, user]);
+  });
+  return () => unsub();
+}, []); // ← CLOSED HERE
+
+/* ---------- 2. Public feed reload ---------- */
+useEffect(() => {
+  if (view === 'public' && user) loadPublicFeed();
+}, [view, following, user]);
   const loadMyItems = async uid => {
     const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
     setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
