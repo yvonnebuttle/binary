@@ -303,6 +303,10 @@ function BinaryApp() {
   };
 
   const unfollowUser = async (userId) => {
+      if (!following.includes(userId)) {
+    showMessage("Not following this user");
+    return;
+  }
     try {
       await db.collection('follows').doc(`${user.uid}_${userId}`).delete();
       setFollowing(following.filter(id => id !== userId));
