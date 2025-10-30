@@ -205,7 +205,7 @@ async function detectCategory(inputText, userLat, userLng) {
 
   const lower = text.toLowerCase();
 
-  // ---- 1. PROXIMITY CHECK (2 km) ----
+  // ---- 1. PROXIMITY CHECK (unchanged) ----
   if (window.google?.maps && userLat && userLng) {
     try {
       await waitForGoogleMaps();
@@ -240,7 +240,7 @@ async function detectCategory(inputText, userLat, userLng) {
     } catch (e) { console.warn('Proximity error:', e); }
   }
 
-  // ---- 2. KEYWORD FALLBACK (FULL_CATEGORIES) ----
+  // ---- 2. KEYWORD FALLBACK (IMPROVED) ----
   if (categoryCache[text]) return categoryCache[text];
 
   const scores = {};
@@ -251,14 +251,15 @@ async function detectCategory(inputText, userLat, userLng) {
     let hits = 0;
     const inputWords = lower.split(/\s+/);
     for (const w of inputWords) {
-      if (words.some(k => k.toLowerCase() === w)) hits++;
+      // PARTIAL MATCH (e.g. "eating" → "ate")
+      if (words.some(k => k.includes(w) || w.includes(k))) hits++;
     }
-    if (hits) scores[cat] = hits * 0.2;   // simple weighting
+    if (hits) scores[cat] = hits;  // ← Raw hits (1 hit = 1 point)
   }
 
-  const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
-  let [best, score] = sorted[0] || ['Other',0];
-  if (score < 0.3) best = 'Other';
+  const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+  let [best, score] = sorted[0] || ['Other', 0];
+  if (score === 0) best = 'Other';  // ← Only "Other" if NO hits
 
   categoryCache[text] = best;
   saveCache();
