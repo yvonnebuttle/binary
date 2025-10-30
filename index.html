@@ -525,20 +525,23 @@ function BinaryApp() {
   const [searchResults, setSearchResults] = useState([]);
   const [message, setMessage] = useState(null);
   // Auth + Load Data
-   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async u => {
-      setUser(u);
-      if (u) {
-        await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
-      }
-      setIsLoading(false);
+  useEffect(() => {
+  const unsub = auth.onAuthStateChanged(async u => {
+    setUser(u);
 
-      // ← ONLY HERE: Firebase is fully initialized
-      await handleRedirectResult();
-    });
+    if (u) {
+      // Load data **only** when we have a real user
+      await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+    }
 
-    return unsub;
-  }, []);
+    setIsLoading(false);
+
+    // ----- MOBILE REDIRECT HANDLING (once) -----
+    if (isMobile) await handleRedirectResult();
+  });
+
+  return unsub;
+}, []);   // <-- no dependencies → runs once
   useEffect(() => {
     if (view === 'public' && user) loadPublicFeed();
   }, [view, following, user]);
@@ -877,6 +880,7 @@ function BinaryApp() {
 }
 // Sign In / Out
 // === Hybrid sign-in: popup on desktop, redirect on mobile ===
+// === Hybrid sign-in: popup on desktop, redirect on mobile ===
 const signInWithGoogle = async () => {
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -903,25 +907,31 @@ const signInWithGoogle = async () => {
     showMessage('Failed to sign in.', 'error');
   }
 };
-    // === Handle the result after a redirect (mobile) ===
+
+// ──────────────────────────────────────────────────────────────
+// 1. NEW: handleRedirectResult – runs **once** and **only** on mobile
+// ──────────────────────────────────────────────────────────────
+let redirectHandled = false;   // <-- prevents double-run
+
 const handleRedirectResult = async () => {
+  if (redirectHandled) return;               // <-- guard
+  redirectHandled = true;
+
   try {
     const result = await auth.getRedirectResult();
     if (result.user) {
       await db.collection('users').doc(result.user.uid).set(
         {
           displayName: result.user.displayName,
-          email: result.user.email,
-          photoURL: result.user.photoURL,
-          lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+          email:       result.user.email,
+          photoURL:    result.user.photoURL,
+          lastLogin:   firebase.firestore.FieldValue.serverTimestamp()
         },
         { merge: true }
       );
-      showMessage('Welcome back!');
     }
-  } catch (error) {
-    console.error('Redirect sign-in error:', error);
-    // Do NOT show a toast here – the user is already on the login screen
+  } catch (err) {
+    console.error('Redirect result error:', err);
   }
 };
 const signOut = async () => {
