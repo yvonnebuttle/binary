@@ -12,7 +12,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBNjg2ZqtsUmoXcMq-guhJAPwY9lIUNPkI&libraries=places" async defer></script>
-    
+   
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -20,10 +20,9 @@
 </head>
 <body>
     <div id="root"></div>
-    
+   
 <script type="text/babel">
 const { useState, useEffect, useCallback, useMemo } = React;
-
 // === Firebase Configuration ===
 const firebaseConfig = {
   apiKey: "AIzaSyBd6y1rHm7X2u-T1f6PiAmB7lZD9N_5IGc",
@@ -33,7 +32,6 @@ const firebaseConfig = {
   messagingSenderId: "394721532495",
   appId: "1:394721532495:web:e0b9265dd19fd36e15283a"
 };
-
 // Initialize Firebase
 let auth, db;
 try {
@@ -44,7 +42,6 @@ try {
 } catch (error) {
   console.error("Firebase initialization error:", error);
 }
-
 // === SVG icons ===
 const ThumbsUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>;
 const ThumbsDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>;
@@ -59,24 +56,20 @@ const Search = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="
 const UserPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>;
 const UserMinus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" x2="16" y1="11" y2="11"/></svg>;
 const X = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
-
 // === Master category list ===
 const ALL_CATEGORIES = [
   'Food', 'Coffee', 'Beverages', 'Places', 'Books', 'Movies',
   'Cheese', 'Dates', 'People', 'Sports', 'Entertainment', 'Things', 'Other'
 ];
-
 let categoryCache = {};
 try {
   const storedCache = localStorage.getItem("categoryCache");
   if (storedCache) categoryCache = JSON.parse(storedCache);
 } catch(err){ console.warn(err); }
-
 function saveCache() {
   try { localStorage.setItem("categoryCache", JSON.stringify(categoryCache)); }
   catch(err){ console.warn(err); }
 }
-
 const CATEGORY_KEYWORDS = {
   Cheese: { exact: ["cheese","cheddar","brie","gouda","mozzarella","parmesan","feta"], score: 0.8 },
   Coffee: { exact: ["coffee","cafe","latte","espresso","cappuccino"], partial: ["starbucks","costa"], score: 0.7 },
@@ -91,7 +84,6 @@ const CATEGORY_KEYWORDS = {
   People: { exact: ["person","friend","colleague","coworker"], score: 0.6 },
   Entertainment: { exact: ["concert","festival","show","performance"], score: 0.6 }
 };
-
 function waitForGoogleMaps() {
   return new Promise(resolve => {
     if (window.google && window.google.maps) return resolve();
@@ -103,7 +95,6 @@ function waitForGoogleMaps() {
     }, 100);
   });
 }
-
 function distanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -111,16 +102,13 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-
 async function detectCategory(inputText, userLat, userLng) {
   const text = inputText.trim();
   if (!text) return 'Other';
   const lower = text.toLowerCase();
   if (categoryCache[text]) return categoryCache[text];
-
   const scores = {};
   ALL_CATEGORIES.forEach(cat => scores[cat] = 0);
-
   for (const [category, config] of Object.entries(CATEGORY_KEYWORDS)) {
     if (config.exact?.some(k => lower.includes(k))) {
       scores[category] = Math.max(scores[category], config.score);
@@ -129,7 +117,6 @@ async function detectCategory(inputText, userLat, userLng) {
       scores[category] = Math.max(scores[category], config.score * 0.7);
     }
   }
-
   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   let [bestCat, bestScore] = sorted[0];
   if (bestScore < 0.3) bestCat = 'Other';
@@ -137,21 +124,18 @@ async function detectCategory(inputText, userLat, userLng) {
   saveCache();
   return bestCat;
 }
-
 // === NEW: UserProfile Component ===
 function UserProfile({ targetUid, onBack, currentUser }) {
   const [profileUser, setProfileUser] = useState(null);
   const [profileItems, setProfileItems] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     let unsubItems;
     (async () => {
       const userDoc = await db.collection('users').doc(targetUid).get();
       if (!userDoc.exists) { setLoading(false); return; }
       setProfileUser({ id: userDoc.id, ...userDoc.data() });
-
       unsubItems = db.collection('items')
         .where('userId', '==', targetUid)
         .where('isPublic', '==', true)
@@ -164,15 +148,12 @@ function UserProfile({ targetUid, onBack, currentUser }) {
     })();
     return () => unsubItems && unsubItems();
   }, [targetUid]);
-
   const filtered = useMemo(() => {
     if (selectedCategory === 'All') return profileItems;
     return profileItems.filter(i => i.category === selectedCategory);
   }, [profileItems, selectedCategory]);
-
   if (loading) return <div className="p-8 text-center">Loading profile…</div>;
   if (!profileUser) return <div className="p-8 text-center">User not found</div>;
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <div className="flex items-center gap-4 mb-6">
@@ -184,7 +165,6 @@ function UserProfile({ targetUid, onBack, currentUser }) {
           <p className="text-sm text-gray-500">Public ratings</p>
         </div>
       </div>
-
       {profileItems.length > 0 && (
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
           <div className="flex items-center gap-2 mb-3">
@@ -201,7 +181,6 @@ function UserProfile({ targetUid, onBack, currentUser }) {
           </div>
         </div>
       )}
-
       <div className="space-y-3">
         {filtered.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
@@ -216,41 +195,36 @@ function UserProfile({ targetUid, onBack, currentUser }) {
     </div>
   );
 }
-
-// ===  ItemCard ===
+// === ItemCard ===
 function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete }) {
   const [editingComment, setEditingComment] = useState(false);
   const [commentText, setCommentText] = useState(item.comment || '');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const isOwn = item.userId === currentUser.uid;
-
   // === TOGGLE LIKE/DISLIKE ===
   const toggleRating = async () => {
     const newRating = item.rating === 'like' ? 'dislike' : 'like';
     await db.collection('items').doc(item.id).update({ rating: newRating });
     onUpdate({ ...item, rating: newRating });
   };
-
   // === TOGGLE PUBLIC/PRIVATE ===
   const togglePublic = async () => {
     const newPublic = !item.isPublic;
     await db.collection('items').doc(item.id).update({ isPublic: newPublic });
     onUpdate({ ...item, isPublic: newPublic });
   };
-
   // === SAVE COMMENT ===
   const saveComment = async () => {
     if (commentText.trim() === (item.comment || '')) {
       setEditingComment(false);
       return;
     }
-    await db.collection('items').doc(item.id).update({ 
-      comment: commentText.trim() || null 
+    await db.collection('items').doc(item.id).update({
+      comment: commentText.trim() || null
     });
     onUpdate({ ...item, comment: commentText.trim() || null });
     setEditingComment(false);
   };
-
   // === CHANGE CATEGORY ===
   const changeCategory = async (newCat) => {
     if (newCat === item.category) return;
@@ -258,20 +232,16 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
     onUpdate({ ...item, category: newCat });
     setShowCategoryPicker(false);
   };
-
   // === DELETE ===
   const handleDelete = async () => {
-    if (!confirm('Delete this item?')) return;
     await db.collection('items').doc(item.id).delete();
     onDelete(item.id);
   };
-
   return (
     <div className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-
             {/* LIKE/DISLIKE TOGGLE */}
             <button
               onClick={isOwn ? toggleRating : undefined}
@@ -284,7 +254,6 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
               {item.rating === 'like' ? <ThumbsUp /> : <ThumbsDown />}
               <span>{item.rating === 'like' ? 'Liked' : 'Disliked'}</span>
             </button>
-
             {/* CATEGORY */}
             <div className="relative">
               <button
@@ -292,7 +261,6 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
                 className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 flex items-center gap-1 hover:bg-purple-200"
               >
                 {item.category}
-                {isOwn && <span className="text-xs">Change</span>}
               </button>
               {isOwn && showCategoryPicker && (
                 <div className="absolute top-full left-0 mt-1 w-40 bg-white rounded-lg shadow-xl border z-10">
@@ -308,7 +276,6 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
                 </div>
               )}
             </div>
-
             {/* PUBLIC/PRIVATE TOGGLE */}
             <button
               onClick={isOwn ? togglePublic : undefined}
@@ -321,7 +288,6 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
               {item.isPublic ? <Globe /> : <Lock />}
               <span>{item.isPublic ? 'Public' : 'Private'}</span>
             </button>
-
             {/* USER (public feed) */}
             {view === 'public' && !isOwn && item.userName && (
               <button
@@ -338,10 +304,8 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
               </span>
             )}
           </div>
-
           <p className="text-gray-800 font-medium mb-1">{item.text}</p>
           <p className="text-sm text-gray-500">{item.date}</p>
-
           {/* COMMENT */}
           {item.comment && !editingComment ? (
             <div className="mt-2 p-3 bg-gray-50 rounded-lg flex items-start justify-between">
@@ -366,11 +330,11 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
                 autoFocus
               />
               <button onClick={saveComment} className="text-green-600 text-xs font-medium">Save</button>
-              <button 
-                onClick={() => { 
-                  setEditingComment(false); 
-                  setCommentText(item.comment || ''); 
-                }} 
+              <button
+                onClick={() => {
+                  setEditingComment(false);
+                  setCommentText(item.comment || '');
+                }}
                 className="text-red-600 text-xs"
               >
                 Cancel
@@ -385,7 +349,6 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
             </button>
           )}
         </div>
-
         {/* DELETE */}
         {isOwn && (
           <button
@@ -415,7 +378,6 @@ function BinaryApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [message, setMessage] = useState(null);
-
   // Auth + Load Data
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async u => {
@@ -427,11 +389,9 @@ function BinaryApp() {
     });
     return unsub;
   }, []);
-
   useEffect(() => {
     if (view === 'public' && user) loadPublicFeed();
   }, [view, following, user]);
-
   useEffect(() => {
     const t = setTimeout(() => {
       if (searchQuery.trim()) searchUsers(searchQuery);
@@ -439,26 +399,21 @@ function BinaryApp() {
     }, 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
-
   const showMessage = (txt, type = 'success') => {
     setMessage({ txt, type });
     setTimeout(() => setMessage(null), 3000);
   };
-
   const loadMyItems = async uid => {
     const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
     setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
-
   const loadFollowing = async uid => {
     const snap = await db.collection('follows').where('followerId', '==', uid).get();
     setFollowing(snap.docs.map(d => d.data().followingId));
   };
-
   const loadPublicFeed = async () => {
     const uids = [user.uid, ...following];
     if (!uids.length) { setPublicItems([]); return; }
-
     const batches = [];
     for (let i = 0; i < uids.length; i += 10) {
       const batch = uids.slice(i, i + 10);
@@ -468,7 +423,6 @@ function BinaryApp() {
         .orderBy('timestamp', 'desc')
         .limit(50)
         .get();
-
       const items = await Promise.all(
         snap.docs.map(async doc => {
           const data = doc.data();
@@ -487,7 +441,6 @@ function BinaryApp() {
     batches.sort((a, b) => b.timestamp - a.timestamp);
     setPublicItems(batches.slice(0, 50));
   };
-
   const searchUsers = async q => {
     const snap = await db.collection('users').get();
     const hits = snap.docs
@@ -495,7 +448,6 @@ function BinaryApp() {
       .filter(u => u.id !== user?.uid && (u.displayName?.toLowerCase().includes(q.toLowerCase()) || u.email?.toLowerCase().includes(q.toLowerCase())));
     setSearchResults(hits);
   };
-
   const followUser = async targetId => {
     if (following.includes(targetId)) return showMessage('Already following');
     await db.collection('follows').doc(`${user.uid}_follows_${targetId}`).set({
@@ -506,14 +458,12 @@ function BinaryApp() {
     setFollowing([...following, targetId]);
     showMessage('Now following');
   };
-
   const unfollowUser = async targetId => {
     await db.collection('follows').doc(`${user.uid}_follows_${targetId}`).delete();
     setFollowing(following.filter(id => id !== targetId));
     showMessage('Unfollowed');
     if (view === 'public') loadPublicFeed();
   };
-
   const addItem = async rating => {
     if (!inputText.trim() || isProcessing) return;
     setIsProcessing(true);
@@ -535,19 +485,16 @@ function BinaryApp() {
     } catch (e) { console.error(e); showMessage('Error', 'error'); }
     finally { setIsProcessing(false); }
   };
-
   const deleteItem = async id => {
     await db.collection('items').doc(id).delete();
     setItems(prev => prev.filter(i => i.id !== id));
     showMessage('Deleted');
   };
-
   const togglePublic = async (id, cur) => {
     await db.collection('items').doc(id).update({ isPublic: !cur });
     setItems(prev => prev.map(i => i.id === id ? { ...i, isPublic: !cur } : i));
     showMessage(cur ? 'Now private' : 'Now public');
   };
-
   const visitProfile = uid => {
     if (!following.includes(uid)) {
       showMessage('Follow this user first to view their page', 'error');
@@ -556,18 +503,15 @@ function BinaryApp() {
     setView('profile');
     setProfileTarget(uid);
   };
-
   const backFromProfile = () => {
     setView('public');
     setProfileTarget(null);
   };
-
   const currentItems = view === 'my' ? items : view === 'public' ? publicItems : [];
   const filteredItems = useMemo(() => {
     if (selectedCategory === 'All') return currentItems;
     return currentItems.filter(i => i.category === selectedCategory);
   }, [currentItems, selectedCategory]);
-
   // Login Screen
   if (!user) {
     return (
@@ -584,23 +528,18 @@ function BinaryApp() {
       </div>
     );
   }
-
   if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
-
   if (view === 'profile' && profileTarget) {
     return <UserProfile targetUid={profileTarget} onBack={backFromProfile} currentUser={user} />;
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
       <div className="max-w-2xl mx-auto px-4 py-6">
-
         {message && (
           <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-medium ${message.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
             {message.txt}
           </div>
         )}
-
         {/* Search Modal */}
         {showUserSearch && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -638,7 +577,6 @@ function BinaryApp() {
             </div>
           </div>
         )}
-
         {/* Header */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -648,7 +586,6 @@ function BinaryApp() {
           </div>
           <p className="text-gray-600">Welcome, {user.displayName}!</p>
         </div>
-
         {/* View Toggle */}
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
           <div className="flex gap-2">
@@ -660,7 +597,6 @@ function BinaryApp() {
             </button>
           </div>
         </div>
-
         {/* Input */}
  {view === 'my' && (
   <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -683,7 +619,6 @@ function BinaryApp() {
         <ThumbsUp />
         {isProcessing ? '…' : 'Like'}
       </button>
-
       {/* DISLIKE BUTTON */}
       <button
         onClick={() => addItem('dislike')}
@@ -712,7 +647,6 @@ function BinaryApp() {
             </div>
           </div>
         )}
-
               {/* Items */}
         <div className="space-y-3">
           {filteredItems.length === 0 ? (
@@ -747,7 +681,6 @@ function BinaryApp() {
                   setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
                 }
               };
-
               const handleDelete = id => {
                 if (view === 'my') {
                   // MY ITEMS: remove from `items`
@@ -758,7 +691,6 @@ function BinaryApp() {
                 }
               };
               // ===============================
-
               return (
                 <ItemCard
                   key={itm.id}
@@ -773,7 +705,6 @@ function BinaryApp() {
             })
           )}
         </div>
-
         {/* Stats */}
         {view === 'my' && items.length > 0 && (
           <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
@@ -794,7 +725,6 @@ function BinaryApp() {
     </div>
   );
 }
-
 // Sign In / Out
 const signInWithGoogle = async () => {
   try {
@@ -812,7 +742,6 @@ const signInWithGoogle = async () => {
     showMessage('Failed to sign in.', 'error');
   }
 };
-
 const signOut = async () => {
   try {
     await auth.signOut();
@@ -825,7 +754,6 @@ const signOut = async () => {
     console.error('Sign out error:', error);
   }
 };
-
 ReactDOM.render(<BinaryApp />, document.getElementById('root'));
 </script>
 </body>
