@@ -285,6 +285,10 @@ function BinaryApp() {
   };
 
   const followUser = async (userId) => {
+  if (following.includes(userId)) {
+    showMessage("You're already following this user");
+    return;
+  }
     try {
       await db.collection('follows').doc(`${user.uid}_${userId}`).set({
         followerId: user.uid,
