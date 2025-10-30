@@ -508,6 +508,23 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
     </div>
   );
 }
+    const showMessage = (txt, type = 'success') => {
+  setMessage({ txt, type });
+  setTimeout(() => setMessage(null), 3000);
+};
+
+const signOut = async () => {
+  try {
+    await auth.signOut();
+    setItems([]);
+    setPublicItems([]);
+    setFollowing([]);
+    setView('my');
+    showMessage('Signed out');
+  } catch (error) {
+    console.error('Sign out error:', error);
+  }
+};
 // === MAIN APP ===
 function BinaryApp() {
   const [user, setUser] = useState(null);
@@ -560,23 +577,19 @@ function BinaryApp() {
     }, 300);
     return () => clearTimeout(t);
   }, [searchQuery]);// Auth + Load Data
-  useEffect(() => {
-  const unsub = auth.onAuthStateChanged(async u => {
-    setUser(u);
-
-    if (u) {
-      // Load data **only** when we have a real user
-      await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
-    }
-
-    setIsLoading(false);
-
-    // ----- MOBILE REDIRECT HANDLING (once) -----
-    if (isMobile) await handleRedirectResult();
-  });
-
-  return unsub;
-}, []);   // <-- no dependencies → runs once
+    /* ---------- 1. Auth observer (once) ---------- */
+useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async u => {
+      setUser(u);
+      if (u) {
+        await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+      }
+      setIsLoading(false);
+      if (isMobile) await handleRedirectResult();
+    });
+    return unsub;
+  }, []);
+    /* ---------- 2. Public feed reload ---------- */
   useEffect(() => {
     if (view === 'public' && user) loadPublicFeed();
   }, [view, following, user]);
@@ -705,7 +718,7 @@ function BinaryApp() {
       </div>
     );
   }
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
+ if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
   if (view === 'profile' && profileTarget) {
     return <UserProfile targetUid={profileTarget} onBack={backFromProfile} currentUser={user} />;
   }
@@ -824,9 +837,9 @@ function BinaryApp() {
             </div>
           </div>
         )}
-              {/* Items */}
-        <div className="space-y-3">
-          {filteredItems.length === 0 ? (
+{/* ---------- 4. Items list ---------- */}
+       <div className="space-y-3">
+        {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
               <p className="text-gray-500">
                 {view === 'public'
@@ -847,46 +860,38 @@ function BinaryApp() {
               )}
             </div>
           ) : (
-            filteredItems.map(itm => {
-              // === CALLBACKS FOR BOTH VIEWS ===
-             const handleUpdate = updatedItem => {
-  if (view === 'my') {
-    setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
-  } else {
-    setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
-  }
-};
-const handleDelete = id => {
-  if (view === 'my') {
-    setItems(prev => prev.filter(i => i.id !== id));
-  } else {
-    setPublicItems(prev => prev.filter(i => i.id !== id));
-  }
-};
-              const handleDelete = id => {
-                if (view === 'my') {
-                  // MY ITEMS: remove from `items`
-                  setItems(prev => prev.filter(i => i.id !== id));
-                } else {
-                  // PUBLIC FEED: remove from `publicItems`
-                  setPublicItems(prev => prev.filter(i => i.id !== id));
-                }
-              };
-              // ===============================
-              return (
-                <ItemCard
-                  key={itm.id}
-                  item={itm}
-                  view={view}
-                  currentUser={user}
-                  onVisitProfile={visitProfile}
-                  onUpdate={handleUpdate}
-                  onDelete={handleDelete}
-                />
-              );
-            })
-          )}
-        </div>
+            ) : (
+          filteredItems.map(itm => {
+            const handleUpdate = updatedItem => {
+              if (view === 'my') {
+                setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
+              } else {
+                setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
+              }
+            };
+
+            const handleDelete = id => {
+              if (view === 'my') {
+                setItems(prev => prev.filter(i => i.id !== id));
+              } else {
+                setPublicItems(prev => prev.filter(i => i.id !== id));
+              }
+            };
+
+            return (
+              <ItemCard
+                key={itm.id}
+                item={itm}
+                view={view}
+                currentUser={user}
+                onVisitProfile={visitProfile}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+              />
+            );
+          })
+        )}
+      </div>
         {/* Stats */}
         {view === 'my' && items.length > 0 && (
           <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
@@ -926,20 +931,5 @@ const handleRedirectResult = async () => {
     console.error('Redirect error:', err);
   }
 };
-
-// === Sign Out ===
-const signOut = async () => {
-  try {
-    await auth.signOut();
-    setItems([]);
-    setPublicItems([]);
-    setFollowing([]);
-    setView('my');
-    showMessage('Signed out');
-  } catch (error) {
-    console.error('Sign out error:', error);
-  }
-};
-
 // === Render App ===
 ReactDOM.render(<BinaryApp />, document.getElementById('root'));
