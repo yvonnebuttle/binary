@@ -220,24 +220,33 @@ function UserProfile({ targetUid, onBack, currentUser }) {
 // === REUSABLE ItemCard ===
 function ItemCard({ item, view, currentUser, onVisitProfile }) {
   const isOwn = item.userId === currentUser.uid;
-  const getRatingEmoji = r => r === 'like' ? 'Like' : 'Dislike';
-  const getRatingColor = r => r === 'like'
-    ? 'bg-green-100 text-green-800 border-green-300'
-    : 'bg-red-100 text-red-800 border-red-300';
 
   return (
     <div className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={`px-3 py-1 rounded-full text-sm font-semibold border-2 ${getRatingColor(item.rating)}`}>
-              {getRatingEmoji(item.rating)} {item.rating === 'like' ? 'Liked' : 'Disliked'}
+
+            {/* RATING BADGE */}
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-semibold border-2 flex items-center gap-1.5
+                ${item.rating === 'like'
+                  ? 'bg-green-100 text-green-800 border-green-300'
+                  : 'bg-red-100 text-red-800 border-red-300'
+                }`}
+            >
+              {item.rating === 'like' ? <ThumbsUp /> : <ThumbsDown />}
+              <span>
+                {item.rating === 'like' ? 'Liked' : 'Disliked'}
+              </span>
             </span>
 
+            {/* CATEGORY */}
             <span className="px-3 py-1 rounded-full text-xs font-medium border bg-purple-100 text-purple-700">
               {item.category}
             </span>
 
+            {/* USER (public feed) */}
             {view === 'public' && !isOwn && item.userName && (
               <button
                 onClick={() => onVisitProfile?.(item.userId)}
@@ -531,20 +540,40 @@ function BinaryApp() {
         </div>
 
         {/* Input */}
-        {view === 'my' && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <input type="text" value={inputText} onChange={e => setInputText(e.target.value)} placeholder="What did you experience?" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none mb-4" disabled={isProcessing} />
-            <div className="flex gap-3">
-              <button id="like-btn" onClick={() => addItem('like')} disabled={!inputText.trim() || isProcessing} className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
-                <ThumbsUp /> {isProcessing ? '…' : 'Like'}
-              </button>
-              <button onClick={() => addItem('dislike')} disabled={!inputText.trim() || isProcessing} className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
-                <ThumbsDown /> {isProcessing ? '…' : 'Dislike'}
-              </button>
-            </div>
-          </div>
-        )}
+ {view === 'my' && (
+  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+    <input
+      type="text"
+      value={inputText}
+      onChange={e => setInputText(e.target.value)}
+      placeholder="What did you experience?"
+      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none mb-4"
+      disabled={isProcessing}
+    />
+    <div className="flex gap-3">
+      {/* LIKE BUTTON */}
+      <button
+        id="like-btn"
+        onClick={() => addItem('like')}
+        disabled={!inputText.trim() || isProcessing}
+        className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
+      >
+        <ThumbsUp />
+        {isProcessing ? '…' : 'Like'}
+      </button>
 
+      {/* DISLIKE BUTTON */}
+      <button
+        onClick={() => addItem('dislike')}
+        disabled={!inputText.trim() || isProcessing}
+        className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
+      >
+        <ThumbsDown />
+        {isProcessing ? '…' : 'Dislike'}
+      </button>
+    </div>
+  </div>
+)}
         {/* Filter */}
         {currentItems.length > 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
