@@ -825,15 +825,20 @@ function BinaryApp() {
           ) : (
             filteredItems.map(itm => {
               // === CALLBACKS FOR BOTH VIEWS ===
-              const handleUpdate = updatedItem => {
-                if (view === 'my') {
-                  // MY ITEMS: update local `items` state
-                  setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
-                } else {
-                  // PUBLIC FEED: update `publicItems` state
-                  setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
-                }
-              };
+             const handleUpdate = updatedItem => {
+  if (view === 'my') {
+    setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
+  } else {
+    setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
+  }
+};
+const handleDelete = id => {
+  if (view === 'my') {
+    setItems(prev => prev.filter(i => i.id !== id));
+  } else {
+    setPublicItems(prev => prev.filter(i => i.id !== id));
+  }
+};
               const handleDelete = id => {
                 if (view === 'my') {
                   // MY ITEMS: remove from `items`
