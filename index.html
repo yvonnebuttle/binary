@@ -289,34 +289,38 @@ function BinaryApp() {
     showMessage("You're already following this user");
     return;
   }
-    try {
-      await db.collection('follows').doc(`${user.uid}_${userId}`).set({
-        followerId: user.uid,
-        followingId: userId,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      setFollowing([...following, userId]);
-      showMessage('Following user!');
-    } catch (error) {
-      console.error('Error following user:', error);
-    }
-  };
+
+  try {
+    await db.collection('follows').doc(`${user.uid}_${userId}`).set({
+      followerId: user.uid,
+      followingId: userId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    setFollowing([...following, userId]);
+    showMessage('Now following!');
+  } catch (error) {
+    console.error('Error following user:', error);
+    showMessage('Failed to follow. Try again.', 'error');
+  }
+};
 
   const unfollowUser = async (userId) => {
-      if (!following.includes(userId)) {
+  if (!following.includes(userId)) {
     showMessage("Not following this user");
     return;
   }
-    try {
-      await db.collection('follows').doc(`${user.uid}_${userId}`).delete();
-      setFollowing(following.filter(id => id !== userId));
-      showMessage('Unfollowed user');
-      if (view === 'public') loadPublicItems();
-    } catch (error) {
-      console.error('Error unfollowing user:', error);
-    }
-  };
 
+  try {
+    await db.collection('follows').doc(`${user.uid}_${userId}`).delete();
+    setFollowing(following.filter(id => id !== userId));
+    showMessage('Unfollowed');
+    if (view === 'public') loadPublicItems();
+  } catch (error) {
+    console.error('Error unfollowing:', error);
+    showMessage('Failed to unfollow.', 'error');
+  }
+};
+    
   const signInWithGoogle = async () => {
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
