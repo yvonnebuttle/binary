@@ -346,7 +346,7 @@ saveCache();
 return best;
 }
     
-// === NEW: UserProfile Component ===
+// === UserProfile Component ===
 function UserProfile({ targetUid, onBack, currentUser }) {
   const [profileUser, setProfileUser] = useState(null);
   const [profileItems, setProfileItems] = useState([]);
@@ -377,6 +377,7 @@ function UserProfile({ targetUid, onBack, currentUser }) {
   if (loading) return <div className="p-8 text-center">Loading profile…</div>;
   if (!profileUser) return <div className="p-8 text-center">User not found</div>;
   return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
     <div className="max-w-2xl mx-auto px-4 py-6">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -415,6 +416,7 @@ function UserProfile({ targetUid, onBack, currentUser }) {
         )}
       </div>
     </div>
+     </div>      
   );
 }
 // === ItemCard ===
@@ -724,6 +726,7 @@ const onTouchEnd = () => {
 const loadComments = async (itemList) => {
   const itemIds = itemList.map(i => i.id);
   if (!itemIds.length) return;
+      
 const batches = [];
   for (let i = 0; i < itemIds.length; i += 30) {
     const batch = itemIds.slice(i, i + 30);
@@ -731,6 +734,7 @@ const batches = [];
       .where('itemId', 'in', batch)
       .orderBy('createdAt', 'asc')
       .get();
+      
       const map = {};
   snap.docs.forEach(d => {
     const c = { id: d.id, ...d.data() };
@@ -739,7 +743,8 @@ const batches = [];
     map[c.itemId] = arr;
   });
   setComments(prev => ({ ...prev, ...map }));
-};
+      }
+      };
 
   const signOut = async () => {
     try {
