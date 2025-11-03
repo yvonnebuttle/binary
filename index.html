@@ -558,7 +558,7 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
               onClick={() => setEditingComment(true)}
               className="mt-2 text-xs text-purple-600 hover:underline"
             >
-              + Add comment
+               Add comment
             </button>
           )}
         </div>
@@ -602,23 +602,22 @@ const [comments, setComments] = useState({});           // { itemId: [{…}] }
   };
     
     // === NEW: Load comments for a list of items ===
-+const loadComments = async (itemList) => {
-+  const itemIds = itemList.map(i => i.id);
-+  if (!itemIds.length) return;
-+  const snap = await db.collection(COMMENTS_COLLECTION)
-+    .where('itemId', 'in', itemIds)
-+    .orderBy('createdAt', 'asc')
-+    .get();
-+  const map = {};
-+  snap.docs.forEach(d => {
-+    const c = { id: d.id, ...d.data() };
-+    const arr = map[c.itemId] || [];
-+    arr.push(c);
-+    map[c.itemId] = arr;
-+  });
-+  setComments(prev => ({ ...prev, ...map }));
-+};
-+
+const loadComments = async (itemList) => {
+  const itemIds = itemList.map(i => i.id);
+  if (!itemIds.length) return;
+  const snap = await db.collection(COMMENTS_COLLECTION)
+    .where('itemId', 'in', itemIds)
+    .orderBy('createdAt', 'asc')
+    .get();
+  const map = {};
+  snap.docs.forEach(d => {
+    const c = { id: d.id, ...d.data() };
+    const arr = map[c.itemId] || [];
+    arr.push(c);
+    map[c.itemId] = arr;
+  });
+  setComments(prev => ({ ...prev, ...map }));
+};
 
   const signOut = async () => {
     try {
