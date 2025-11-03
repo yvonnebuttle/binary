@@ -204,7 +204,7 @@ function saveCache() {
             "the hunt for red october","1984","to kill a mockingbird","pride and prejudice","great gatsby",
             "harry potter and the sorcerer's stone","the da vinci code","the alchemist","sapiens","becoming",
             "the power of habit","quiet","daring greatly","the body keeps the score",
-            "how to win friends and influence people","thinking fast and slow","man’s search for meaning",
+            "how to win friends and influence people","thinking fast and slow","man's search for meaning",
             "the subtle art of not giving a f*ck","milk and honey","the sun and her flowers", "literature",
   ],
   'Movies': [ 'watching',
@@ -217,10 +217,14 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const isAndroid = /Android/.test(navigator.userAgent);
 const isMobile = isIOS || isAndroid;
 
-// DETECT IF OPENED FROM HOME SCREEN (PWA)
-const isInStandaloneMode = () => 
-  (window.matchMedia('(display-mode: standalone)').matches) || 
-  (window.navigator.standalone === true);
+// IMPROVED PWA detection
+const isInStandaloneMode = () => {
+  // Check both display-mode and navigator.standalone for iOS
+  return (
+    window.matchMedia('(display-mode: standalone)').matches || 
+    ('standalone' in window.navigator && window.navigator.standalone === true)
+  );
+};
     
 function waitForGoogleMaps() {
   return new Promise(resolve => {
@@ -290,7 +294,7 @@ if (window.google?.maps && userLat && userLng) {
             types.includes('pub') || 
             types.includes('night_club') || 
             types.includes('establishment')) {
-          return 'Beverages';
+          return 'Pints';
         }
         if (types.some(t => ['museum', 'park', 'tourist_attraction', 'point_of_interest'].includes(t))) {
           return 'Places';
@@ -584,119 +588,158 @@ function BinaryApp() {
   const [searchResults, setSearchResults] = useState([]);
   const [message, setMessage] = useState(null);
 
-    // === CORRECT: showMessage & signOut INSIDE component ===
-      const showMessage = (txt, type = 'success') => {
-  setMessage({ txt, type });
-  setTimeout(() => setMessage(null), 3000);
-};
+  const showMessage = (txt, type = 'success') => {
+    setMessage({ txt, type });
+    setTimeout(() => setMessage(null), 3000);
+  };
 
-const signOut = async () => {
-  try {
-    await auth.signOut();
-    setItems([]);
-    setPublicItems([]);
-    setFollowing([]);
-    setView('my');
-    showMessage('Signed out');
-  } catch (error) {
-    console.error('Sign out error:', error);
-  }
-};
-  // === Yes CORRECT: signInWithGoogle HERE ===
+  const signOut = async () => {
+    try {
+      await auth.signOut();
+      setItems([]);
+      setPublicItems([]);
+      setFollowing([]);
+      setView('my');
+      showMessage('Signed out');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  // Helper to save user data
+  const saveUserToFirestore = async (user) => {
+    await db.collection('users').doc(user.uid).set({
+      displayName: user.displayName,
+      email: user.email,
+      photoURL: user.photoURL,
+      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  };
+
+  // IMPROVED SIGN-IN FUNCTION
   const signInWithGoogle = async () => {
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' }); // Avoid cached login issues
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ 
+        prompt: 'select_account',
+        // Force fresh authentication
+        auth_type: 'reauthenticate'
+      });
 
-    // === iOS PWA: FORCE POPUP (WORKS) ===
-    if (isIOS && isInStandaloneMode()) {
-      console.log('iOS PWA detected → using popup');
+      console.log('Device info:', { isIOS, isAndroid, isMobile, isPWA: isInStandaloneMode() });
+
+      // iOS PWA: Always use popup (most reliable)
+      if (isIOS && isInStandaloneMode()) {
+        console.log('iOS PWA → using popup');
+        try {
+          const result = await auth.signInWithPopup(provider);
+          await saveUserToFirestore(result.user);
+          showMessage('Welcome!');
+        } catch (popupError) {
+          console.error('Popup failed:', popupError);
+          // Fallback to redirect if popup fails
+          if (popupError.code === 'auth/popup-blocked') {
+            showMessage('Popup blocked, trying redirect...', 'error');
+            await auth.signInWithRedirect(provider);
+          }
+        }
+        return;
+      }
+
+      // iOS Safari (not PWA): Use redirect (popup often fails)
+      if (isIOS && !isInStandaloneMode()) {
+        console.log('iOS Safari → using redirect');
+        await auth.signInWithRedirect(provider);
+        return;
+      }
+
+      // Android: Always use redirect
+      if (isAndroid) {
+        console.log('Android → using redirect');
+        await auth.signInWithRedirect(provider);
+        return;
+      }
+
+      // Desktop: Use popup
+      console.log('Desktop → using popup');
       const result = await auth.signInWithPopup(provider);
       await saveUserToFirestore(result.user);
-      showMessage('Signed in!');
-      return;
+      showMessage('Welcome!');
+
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      if (error.code === 'auth/popup-blocked') {
+        showMessage('Popups blocked. Please allow popups or try again.', 'error');
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        showMessage('Sign-in cancelled', 'error');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        showMessage('Domain not authorized. Check Firebase settings.', 'error');
+      } else {
+        showMessage('Sign-in failed. Please try again.', 'error');
+      }
     }
+  };
 
-    // === Mobile (non-PWA iOS or Android): Use redirect ===
-    if (isMobile) {
-      console.log('Mobile detected → using redirect');
-      await auth.signInWithRedirect(provider);
-      return;
-    }
-
-    // === Desktop: Use popup ===
-    console.log('Desktop → using popup');
-    const result = await auth.signInWithPopup(provider);
-    await saveUserToFirestore(result.user);
-    showMessage('Welcome back!');
-
-  } catch (error) {
-    console.error('Sign-in error:', error);
-    if (error.code === 'auth/popup-blocked') {
-      showMessage('Please allow popups and try again.', 'error');
-    } else if (error.code === 'auth/operation-not-allowed') {
-      showMessage('Sign-in method not enabled in Firebase.', 'error');
-    } else {
-      showMessage('Sign-in failed. Try in Safari tab.', 'error');
-    }
-  }
-};
-
-// Helper to avoid duplicate code
-const saveUserToFirestore = async (user) => {
-  await db.collection('users').doc(user.uid).set({
-    displayName: user.displayName,
-    email: user.email,
-    photoURL: user.photoURL,
-    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
-};
-
-  // === Your search debounce useEffect (now safe) === first
+  // Search debounce
   useEffect(() => {
     const t = setTimeout(() => {
       if (searchQuery.trim()) searchUsers(searchQuery);
       else setSearchResults([]);
     }, 300);
     return () => clearTimeout(t);
-  }, [searchQuery]);// Auth + Load Data
-/* ---------- 1. Auth observer (once) ---------- */
-useEffect(() => {
-  const unsub = auth.onAuthStateChanged(async u => {
-    setUser(u);
-    if (u) {
-      await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
-    }
-    setIsLoading(false);
+  }, [searchQuery]);
 
-    // iOS PWA: handle popup fallback
-    if (isIOS && isInStandaloneMode()) {
+  // Auth observer with redirect handling
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      console.log('Auth state changed:', u?.uid || 'logged out');
+      setUser(u);
+      
+      if (u) {
+        await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+      }
+      
+      setIsLoading(false);
+    });
+
+    // Handle redirect result ONCE after auth is ready
+    const checkRedirect = async () => {
       try {
         const result = await auth.getRedirectResult();
-        if (result.user) {
+        if (result && result.user) {
+          console.log('Redirect result found:', result.user.uid);
           await saveUserToFirestore(result.user);
-          showMessage('Signed in via popup!');
+          showMessage('Signed in successfully!');
         }
-      } catch (err) {
-        if (err.code !== 'auth/no-such-redirect-result') console.error(err);
+      } catch (error) {
+        // Ignore "no redirect result" error (expected on normal page loads)
+        if (error.code !== 'auth/no-redirect-result') {
+          console.error('Redirect error:', error);
+          showMessage('Sign-in error. Please try again.', 'error');
+        }
       }
-    }
-  });
-  return () => unsub();
-}, []); // ← CLOSED HERE
+    };
 
-/* ---------- 2. Public feed reload ---------- */
-useEffect(() => {
-  if (view === 'public' && user) loadPublicFeed();
-}, [view, following, user]);
+    checkRedirect();
+
+    return () => unsub();
+  }, []);
+
+  // Public feed reload
+  useEffect(() => {
+    if (view === 'public' && user) loadPublicFeed();
+  }, [view, following, user]);
+
   const loadMyItems = async uid => {
     const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
     setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
+
   const loadFollowing = async uid => {
     const snap = await db.collection('follows').where('followerId', '==', uid).get();
     setFollowing(snap.docs.map(d => d.data().followingId));
   };
+
   const loadPublicFeed = async () => {
     const uids = [user.uid, ...following];
     if (!uids.length) { setPublicItems([]); return; }
@@ -727,6 +770,7 @@ useEffect(() => {
     batches.sort((a, b) => b.timestamp - a.timestamp);
     setPublicItems(batches.slice(0, 50));
   };
+
   const searchUsers = async q => {
     const snap = await db.collection('users').get();
     const hits = snap.docs
@@ -734,6 +778,7 @@ useEffect(() => {
       .filter(u => u.id !== user?.uid && (u.displayName?.toLowerCase().includes(q.toLowerCase()) || u.email?.toLowerCase().includes(q.toLowerCase())));
     setSearchResults(hits);
   };
+
   const followUser = async targetId => {
     if (following.includes(targetId)) return showMessage('Already following');
     await db.collection('follows').doc(`${user.uid}_follows_${targetId}`).set({
@@ -744,62 +789,69 @@ useEffect(() => {
     setFollowing([...following, targetId]);
     showMessage('Now following');
   };
+
   const unfollowUser = async targetId => {
     await db.collection('follows').doc(`${user.uid}_follows_${targetId}`).delete();
     setFollowing(following.filter(id => id !== targetId));
     showMessage('Unfollowed');
     if (view === 'public') loadPublicFeed();
   };
-const addItem = async rating => {
-  if (!inputText.trim() || isProcessing) return;
-  setIsProcessing(true);
-  try {
-    // GET USER LOCATION
-    let userLat = null, userLng = null;
-    if (navigator.geolocation) {
-      try {
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 5000,
-            maximumAge: 60000 // Cache for 1 minute
-          });
-        });
-        userLat = position.coords.latitude;
-        userLng = position.coords.longitude;
-      } catch (geoError) {
-        console.warn('Location unavailable:', geoError);
-      }
-    }
 
-    // PASS LOCATION TO detectCategory
-    const cat = await detectCategory(inputText, userLat, userLng);
-    
-    const payload = {
-      text: inputText.trim(),
-      rating,
-      category: cat,
-      timestamp: Date.now(),
-      date: new Date().toLocaleDateString(),
-      userId: user.uid,
-      isPublic: true
-    };
-    const ref = await db.collection('items').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-    setItems(prev => [{ id: ref.id, ...payload }, ...prev]);
-    setInputText('');
-    showMessage('Added!');
-  } catch (e) { console.error(e); showMessage('Error', 'error'); }
-  finally { setIsProcessing(false); }
-};
+  const addItem = async rating => {
+    if (!inputText.trim() || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      let userLat = null, userLng = null;
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 5000,
+              maximumAge: 60000
+            });
+          });
+          userLat = position.coords.latitude;
+          userLng = position.coords.longitude;
+        } catch (geoError) {
+          console.warn('Location unavailable:', geoError);
+        }
+      }
+
+      const cat = await detectCategory(inputText, userLat, userLng);
+      
+      const payload = {
+        text: inputText.trim(),
+        rating,
+        category: cat,
+        timestamp: Date.now(),
+        date: new Date().toLocaleDateString(),
+        userId: user.uid,
+        isPublic: true
+      };
+      const ref = await db.collection('items').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      setItems(prev => [{ id: ref.id, ...payload }, ...prev]);
+      setInputText('');
+      showMessage('Added!');
+    } catch (e) { 
+      console.error(e); 
+      showMessage('Error adding item', 'error'); 
+    } finally { 
+      setIsProcessing(false); 
+    }
+  };
+
   const deleteItem = async id => {
     await db.collection('items').doc(id).delete();
     setItems(prev => prev.filter(i => i.id !== id));
     showMessage('Deleted');
   };
+
   const togglePublic = async (id, cur) => {
     await db.collection('items').doc(id).update({ isPublic: !cur });
     setItems(prev => prev.map(i => i.id === id ? { ...i, isPublic: !cur } : i));
     showMessage(cur ? 'Now private' : 'Now public');
   };
+
   const visitProfile = uid => {
     if (!following.includes(uid)) {
       showMessage('Follow this user first to view their page', 'error');
@@ -808,15 +860,18 @@ const addItem = async rating => {
     setView('profile');
     setProfileTarget(uid);
   };
+
   const backFromProfile = () => {
     setView('public');
     setProfileTarget(null);
   };
+
   const currentItems = view === 'my' ? items : view === 'public' ? publicItems : [];
   const filteredItems = useMemo(() => {
     if (selectedCategory === 'All') return currentItems;
     return currentItems.filter(i => i.category === selectedCategory);
   }, [currentItems, selectedCategory]);
+
   // Login Screen
   if (!user) {
     return (
@@ -824,19 +879,37 @@ const addItem = async rating => {
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Binary</h1>
           <p className="text-gray-600 mb-8">Yes/no, that's all</p>
-          <button onClick={signInWithGoogle}
-            className="w-full bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-3">
-            <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          <button 
+            onClick={signInWithGoogle}
+            className="w-full bg-white border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-3 transition-all hover:shadow-md"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
             Sign in with Google
           </button>
+          {isIOS && (
+            <p className="text-xs text-gray-500 mt-4">
+              iOS users: If sign-in doesn't work, try allowing popups in Safari settings.
+            </p>
+          )}
+            <footer style="text-align:center; padding:1rem; font-size:0.8rem; color:#666;">
+  <a href="https://yvonnebuttle.github.io/binary/privacy.html" target="_blank">Privacy Policy</a>
+</footer>
         </div>
       </div>
     );
   }
- if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
+
   if (view === 'profile' && profileTarget) {
     return <UserProfile targetUid={profileTarget} onBack={backFromProfile} currentUser={user} />;
   }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
       <div className="max-w-2xl mx-auto px-4 py-6">
@@ -845,6 +918,7 @@ const addItem = async rating => {
             {message.txt}
           </div>
         )}
+        
         {/* Search Modal */}
         {showUserSearch && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -882,6 +956,7 @@ const addItem = async rating => {
             </div>
           </div>
         )}
+
         {/* Header */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -891,6 +966,7 @@ const addItem = async rating => {
           </div>
           <p className="text-gray-600">Welcome, {user.displayName}!</p>
         </div>
+
         {/* View Toggle */}
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
           <div className="flex gap-2">
@@ -902,40 +978,39 @@ const addItem = async rating => {
             </button>
           </div>
         </div>
+
         {/* Input */}
- {view === 'my' && (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-    <input
-      type="text"
-      value={inputText}
-      onChange={e => setInputText(e.target.value)}
-      placeholder="What did you experience?"
-      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none mb-4"
-      disabled={isProcessing}
-    />
-    <div className="flex gap-3">
-      {/* LIKE BUTTON */}
-      <button
-        id="like-btn"
-        onClick={() => addItem('like')}
-        disabled={!inputText.trim() || isProcessing}
-        className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
-      >
-        <ThumbsUp />
-        {isProcessing ? '…' : 'Like'}
-      </button>
-      {/* DISLIKE BUTTON */}
-      <button
-        onClick={() => addItem('dislike')}
-        disabled={!inputText.trim() || isProcessing}
-        className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
-      >
-        <ThumbsDown />
-        {isProcessing ? '…' : 'Dislike'}
-      </button>
-    </div>
-  </div>
-)}
+        {view === 'my' && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <input
+              type="text"
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              placeholder="What did you experience?"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none mb-4"
+              disabled={isProcessing}
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => addItem('like')}
+                disabled={!inputText.trim() || isProcessing}
+                className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
+              >
+                <ThumbsUp />
+                {isProcessing ? '…' : 'Like'}
+              </button>
+              <button
+                onClick={() => addItem('dislike')}
+                disabled={!inputText.trim() || isProcessing}
+                className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
+              >
+                <ThumbsDown />
+                {isProcessing ? '…' : 'Dislike'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Filter */}
         {currentItems.length > 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
@@ -952,9 +1027,10 @@ const addItem = async rating => {
             </div>
           </div>
         )}
-{/* ---------- 4. Items list ---------- */}
-       <div className="space-y-3">
-        {filteredItems.length === 0 ? (
+
+        {/* Items list */}
+        <div className="space-y-3">
+          {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
               <p className="text-gray-500">
                 {view === 'public'
@@ -974,38 +1050,39 @@ const addItem = async rating => {
                 </button>
               )}
             </div>
-) : (
-  filteredItems.map(itm => {
-            const handleUpdate = updatedItem => {
-              if (view === 'my') {
-                setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
-              } else {
-                setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
-              }
-            };
+          ) : (
+            filteredItems.map(itm => {
+              const handleUpdate = updatedItem => {
+                if (view === 'my') {
+                  setItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
+                } else {
+                  setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
+                }
+              };
 
-            const handleDelete = id => {
-              if (view === 'my') {
-                setItems(prev => prev.filter(i => i.id !== id));
-              } else {
-                setPublicItems(prev => prev.filter(i => i.id !== id));
-              }
-            };
+              const handleDelete = id => {
+                if (view === 'my') {
+                  setItems(prev => prev.filter(i => i.id !== id));
+                } else {
+                  setPublicItems(prev => prev.filter(i => i.id !== id));
+                }
+              };
 
-            return (
-              <ItemCard
-                key={itm.id}
-                item={itm}
-                view={view}
-                currentUser={user}
-                onVisitProfile={visitProfile}
-                onUpdate={handleUpdate}
-                onDelete={handleDelete}
-              />
-            );
-          })
-        )}
-      </div>
+              return (
+                <ItemCard
+                  key={itm.id}
+                  item={itm}
+                  view={view}
+                  currentUser={user}
+                  onVisitProfile={visitProfile}
+                  onUpdate={handleUpdate}
+                  onDelete={handleDelete}
+                />
+              );
+            })
+          )}
+        </div>
+
         {/* Stats */}
         {view === 'my' && items.length > 0 && (
           <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
@@ -1022,28 +1099,23 @@ const addItem = async rating => {
             </div>
           </div>
         )}
+          {/*main page footer*/}
+           <div className="mt-8 text-center pb-4">
+          <a href="https://yvonnebuttle.github.io/binary/privacy.html" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-500 hover:text-purple-600">
+            Privacy Policy
+          </a>
+        </div>
+      </div>  {/* This closes max-w-2xl mx-auto */}
+    </div>  {/* This closes min-h-screen */}
+  );
+}
       </div>
     </div>
   );
 }
-// === Mobile redirect handling (once) ===
-let redirectHandled = false;
-const handleRedirectResult = async () => {
-  if (redirectHandled) return;
-  redirectHandled = true;
-  try {
-    const result = await auth.getRedirectResult();
-    if (result.user) {
-      await db.collection('users').doc(result.user.uid).set({
-        displayName: result.user.displayName,
-        email: result.user.email,
-        photoURL: result.user.photoURL,
-        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    }
-  } catch (err) {
-    console.error('Redirect error:', err);
-  }
-};
-// === Render App ===
+
+// Render App
 ReactDOM.render(<BinaryApp />, document.getElementById('root'));
+</script>
+</body>
+</html>
