@@ -336,34 +336,36 @@ async function detectCategory(inputText, userLat, userLng) {
         const closest = results[0];
         const dist = distanceKm(userLat, userLng, closest.geometry.location.lat(), closest.geometry.location.lng());
 
-        if (dist <= 2) {
-          const types = closest.types || [];
-
-          if (types.includes('restaurant') || types.includes('food') || types.includes('meal_takeaway') || types.includes('bakery')) {
-            console.log('✅ Google Maps: Food');
-            categoryCache[normalized] = 'Food';
-            saveCache();
-            return 'Food';
-          }
-          if (types.includes('coffee_shop') || types.includes('cafe')) {
-            console.log('✅ Google Maps: Coffee');
-            categoryCache[normalized] = 'Coffee';
-            saveCache();
-            return 'Coffee';
-          }
-          if (types.includes('bar') || types.includes('pub') || types.includes('night_club')) {
-            console.log('✅ Google Maps: Pints');
-            categoryCache[normalized] = 'Pints';
-            saveCache();
-            return 'Pints';
-          }
-          if (types.some(t => ['museum', 'park', 'tourist_attraction'].includes(t))) {
-            console.log('✅ Google Maps: Places');
-            categoryCache[normalized] = 'Places';
-            saveCache();
-            return 'Places';
-          }
-        }
+   if (dist <= 2) {
+  const types = closest.types || [];
+  const lat = closest.geometry.location.lat();
+  const lng = closest.geometry.location.lng();
+  
+  if (types.includes('restaurant') || types.includes('food') || types.includes('meal_takeaway') || types.includes('bakery')) {
+    console.log('✅ Google Maps: Food');
+    categoryCache[normalized] = 'Food';
+    saveCache();
+    return { category: 'Food', lat, lng };
+  }
+  if (types.includes('coffee_shop') || types.includes('cafe')) {
+    console.log('✅ Google Maps: Coffee');
+    categoryCache[normalized] = 'Coffee';
+    saveCache();
+    return { category: 'Coffee', lat, lng };
+  }
+  if (types.includes('bar') || types.includes('pub') || types.includes('night_club')) {
+    console.log('✅ Google Maps: Pints');
+    categoryCache[normalized] = 'Pints';
+    saveCache();
+    return { category: 'Pints', lat, lng };
+  }
+  if (types.some(t => ['museum', 'park', 'tourist_attraction'].includes(t))) {
+    console.log('✅ Google Maps: Places');
+    categoryCache[normalized] = 'Places';
+    saveCache();
+    return { category: 'Places', lat, lng };
+  }
+}
       }
     } catch (e) {
       console.warn('Proximity error:', e);
@@ -491,14 +493,14 @@ function UserProfile({ targetUid, onBack, currentUser }) {
   );
 }
 // === ItemCard ===
-function ItemCard({ 
+function ItemCard({
   item, view, currentUser, onVisitProfile, onUpdate, onDelete,
-  comments, setComments 
+  comments, setComments, userLat, userLng
 }) {
   const [editingComment, setEditingComment] = useState(false);
   const [commentText, setCommentText] = useState(item.comment || '');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-    const [editingReply, setEditingReply] = useState(false);
+  const [editingReply, setEditingReply] = useState(false);
   const [replyText, setReplyText] = useState('');
   const isOwn = item.userId === currentUser.uid;
   // === TOGGLE LIKE/DISLIKE ===
@@ -525,58 +527,52 @@ function ItemCard({
     onUpdate({ ...item, comment: commentText.trim() || null });
     setEditingComment(false);
   };
- // === CHANGE CATEGORY ===
-const changeCategory = async (newCat) => {
-  if (newCat === item.category) return;
-  await db.collection('items').doc(item.id).update({ category: newCat });
-  onUpdate({ ...item, category: newCat });
-  setShowCategoryPicker(false);
-  
-  // === CACHE MANUAL CATEGORIZATION ===
-  const normalized = normalizeForCache(item.text);
-  categoryCache[normalized] = newCat;
-  saveCache();
-  console.log('💾 Cached manual categorization:', normalized, '→', newCat);
-};
-  // === DELETE ===
+  // === CHANGE CATEGORY ===
+  const changeCategory = async (newCat) => {
+    if (newCat === item.category) return;
+    await db.collection('items').doc(item.id).update({ category: newCat });
+    onUpdate({ ...item, category: newCat });
+    setShowCategoryPicker(false);
+    // === CACHE MANUAL CATEGORIZATION ===
+    const normalized = normalizeForCache(item.text);
+    categoryCache[normalized] = newCat;
+    saveCache();
+    console.log('💾 Cached manual categorization:', normalized, '→', newCat);
+  };
+  // === DELETE ITEM ===
   const handleDelete = async () => {
     await db.collection('items').doc(item.id).delete();
     onDelete(item.id);
   };
-    // === SEND REPLY ===
-const sendReply = async () => {
-  const txt = replyText.trim();
-  if (!txt || txt.length > 120) return;
-
-  const payload = {
-    itemId: item.id,
-    text: txt,
-    userId: currentUser.uid,
-    userName: currentUser.displayName,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-  };
-
-  try {
-    const ref = await db.collection(COMMENTS_COLLECTION).add(payload);
-    const newComment = {
-      id: ref.id,
-      ...payload,
-      createdAt: new Date() // fallback for display
+  // === SEND REPLY ===
+  const sendReply = async () => {
+    const txt = replyText.trim();
+    if (!txt || txt.length > 120) return;
+    const payload = {
+      itemId: item.id,
+      text: txt,
+      userId: currentUser.uid,
+      userName: currentUser.displayName,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
-
-    // Use the passed setComments from parent
-setComments(prev => ({
-  ...prev,
-  [item.id]: [...(prev?.[item.id] || []), newComment]
-}));
-
-    setReplyText('');
-    setEditingReply(false);
-  } catch (error) {
-    console.error('Failed to add comment:', error);
-    alert('Failed to post comment. Check console.');
-  }
-};
+    try {
+      const ref = await db.collection(COMMENTS_COLLECTION).add(payload);
+      const newComment = {
+        id: ref.id,
+        ...payload,
+        createdAt: new Date() // fallback for display
+      };
+      setComments(prev => ({
+        ...prev,
+        [item.id]: [...(prev?.[item.id] || []), newComment]
+      }));
+      setReplyText('');
+      setEditingReply(false);
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+      alert('Failed to post comment. Check console.');
+    }
+  };
   return (
     <div className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between">
@@ -628,6 +624,20 @@ setComments(prev => ({
               {item.isPublic ? <Globe /> : <Lock />}
               <span>{item.isPublic ? 'Public' : 'Private'}</span>
             </button>
+
+              {/* GEOTAG BADGE */}
+{item.geoLat && item.geoLng && (
+  <a
+    href={`https://www.google.com/maps/search/?api=1&query=${item.geoLat},${item.geoLng}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 flex items-center gap-1 transition-colors"
+    title={`View "${item.text}" on map`}
+    onClick={(e) => e.stopPropagation()} // Prevent card interactions
+  >
+    📍{" "}{distanceKm(userLat || item.geoLat, userLng || item.geoLng, item.geoLat, item.geoLng).toFixed(1)}km
+  </a>
+)}
             {/* USER (public feed) */}
             {view === 'public' && !isOwn && item.userName && (
               <button
@@ -699,23 +709,48 @@ setComments(prev => ({
           </button>
         )}
       </div>
-
-{/* === PUBLIC COMMENTS SECTION === */}
-{item.isPublic && (
-  <div className="mt-4 border-t pt-3">
-    {/* Comment List */}
-    <div className="space-y-2 mb-3">
-      {(comments?.[item.id] || []).map(c => (
-        <div key={c.id} className="flex items-start gap-2 text-sm">
-          <div className="font-medium text-purple-700">{c.userName}:</div>
-          <div className="text-gray-700">{c.text}</div>
-        </div>
-      ))}
-      {(!comments?.[item.id] || comments[item.id]?.length === 0) && (
-        <p className="text-xs text-gray-400 italic">No comments yet</p>
-      )}
-    </div>
-          
+      {/* === PUBLIC COMMENTS SECTION === */}
+      {item.isPublic && (
+        <div className="mt-4 border-t pt-3">
+          {/* Comment List */}
+          <div className="space-y-2 mb-3">
+            {(comments?.[item.id] || []).map(c => {
+              const isOwnComment = c.userId === currentUser.uid;
+              const handleDeleteComment = async () => {
+                try {
+                  await db.collection(COMMENTS_COLLECTION).doc(c.id).delete();
+                  setComments(prev => ({
+                    ...prev,
+                    [item.id]: prev[item.id]?.filter(cm => cm.id !== c.id) || []
+                  }));
+                } catch (error) {
+                  console.error('Delete failed:', error);
+                  alert('Oops, delete failed—try again?');
+                }
+              };
+              return (
+                <div key={c.id} className="flex items-start gap-2 text-sm relative group">
+                  <div className="font-medium text-purple-700">{c.userName}:</div>
+                  <div className="text-gray-700 flex-1">{c.text}</div>
+                  <div className="text-xs text-gray-400 ml-auto">
+                    {c.createdAt ? new Date(c.createdAt.toDate?.() || c.createdAt).toLocaleString() : 'Just now'}
+                  </div>
+                  {isOwnComment && (
+                    <button
+                      onClick={handleDeleteComment}
+                      className="absolute -top-1 -right-1 p-1 text-gray-300 hover:text-red-600 rounded-full hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                      title="Delete comment"
+                    >
+                      <Trash2 width="12" height="12" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {(!comments?.[item.id] || comments[item.id]?.length === 0) && (
+              <p className="text-xs text-gray-500 italic">No comments yet</p>
+            )}
+          </div>
           {/* Add comment trigger */}
           {editingReply ? (
             <div className="flex gap-1.5 items-center mt-2">
@@ -757,9 +792,12 @@ setComments(prev => ({
     </div>
   );
 }
+        
 // === MAIN APP ===
 function BinaryApp() {
-  const [user, setUser] = useState(null);
+const [user, setUser] = useState(null);
+const [userLat, setUserLat] = useState(null);  // NEW
+const [userLng, setUserLng] = useState(null);  // NEW
   const [items, setItems] = useState([]);
   const [publicItems, setPublicItems] = useState([]);
   const [following, setFollowing] = useState([]);
@@ -910,86 +948,96 @@ const batches = [];
       await saveUserToFirestore(result.user);
       showMessage('Welcome!');
 
+ // Auth observer with redirect handling
+useEffect(() => {
+  const unsub = auth.onAuthStateChanged(async (u) => {
+    console.log('Auth state changed:', u?.uid || 'logged out');
+    setUser(u);
+   
+    if (u) {
+      await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+    }
+   
+    setIsLoading(false);
+  });
+
+    // Public feed reload with reset
+useEffect(() => {
+  if (view === 'public' && user) {
+    setHasMore(true);
+    setLastDoc(null);
+    setPublicItems([]); // Clear for fresh load
+    loadPublicFeed();
+  }
+}, [view, following, user]);
+
+// Infinite scroll observer
+useEffect(() => {
+  if (view !== 'public' || !hasMore || publicItems.length === 0 || loadingMore) return;
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        loadPublicFeed(lastDoc);
+      }
+    },
+    { threshold: 0.1 }
+  );
+  const lastItemEl = document.querySelector('.space-y-3 > *:last-child');
+  if (lastItemEl) observer.observe(lastItemEl);
+  return () => observer.disconnect();
+}, [publicItems, lastDoc, hasMore, loadingMore, view]);
+    
+  // Handle redirect result ONCE after auth is ready
+  const checkRedirect = async () => {
+    try {
+      const result = await auth.getRedirectResult();
+      if (result && result.user) {
+        console.log('Redirect result found:', result.user.uid);
+        await saveUserToFirestore(result.user);
+        showMessage('Signed in successfully!');
+      }
     } catch (error) {
-      console.error('Sign-in error:', error);
-      if (error.code === 'auth/popup-blocked') {
-        showMessage('Popups blocked. Please allow popups or try again.', 'error');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        showMessage('Sign-in cancelled', 'error');
-      } else if (error.code === 'auth/unauthorized-domain') {
-        showMessage('Domain not authorized. Check Firebase settings.', 'error');
-      } else {
-        showMessage('Sign-in failed. Please try again.', 'error');
+      // Ignore "no redirect result" error (expected on normal page loads)
+      if (error.code !== 'auth/no-redirect-result') {
+        console.error('Redirect error:', error);
+        showMessage('Sign-in error. Please try again.', 'error');
       }
     }
   };
+  checkRedirect();  // Call it here (if missing)
+  return () => unsub();
+}, []);  // Empty deps for once-on-load
 
-  // Search debounce
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (searchQuery.trim()) searchUsers(searchQuery);
-      else setSearchResults([]);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
-
-  // Auth observer with redirect handling
-  useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async (u) => {
-      console.log('Auth state changed:', u?.uid || 'logged out');
-      setUser(u);
-      
-      if (u) {
-        await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
-      }
-      
-      setIsLoading(false);
-    });
-
-    // Handle redirect result ONCE after auth is ready
-    const checkRedirect = async () => {
-      try {
-        const result = await auth.getRedirectResult();
-        if (result && result.user) {
-          console.log('Redirect result found:', result.user.uid);
-          await saveUserToFirestore(result.user);
-          showMessage('Signed in successfully!');
-        }
-      } catch (error) {
-        // Ignore "no redirect result" error (expected on normal page loads)
-        if (error.code !== 'auth/no-redirect-result') {
-          console.error('Redirect error:', error);
-          showMessage('Sign-in error. Please try again.', 'error');
-        }const loadPublicFeed = async (startAfterDoc = null) => {
-  if (loadingMore && startAfterDoc) return;  // Don't double-load
-  setLoadingMore(true);
-  const uids = [user.uid, ...following];  // Your users (self + follows)
-  if (!uids.length) { 
-    setPublicItems([]); 
-    setLoadingMore(false); 
-    setHasMore(false); 
-    return; 
+    // Get user location once on mount
+useEffect(() => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLat(pos.coords.latitude);
+        setUserLng(pos.coords.longitude);
+      },
+      (err) => console.warn('Location unavailable:', err),
+      { maximumAge: 300000 } // Cache for 5 mins
+    );
   }
-
-  let allNewItems = [];  // Collect items from batches
-  for (let i = 0; i < uids.length; i += 10) {  // Batch UIDs (Firestore limit)
+}, []);
+        
+  let allNewItems = []; // Collect items from batches
+  for (let i = 0; i < uids.length; i += 10) { // Batch UIDs (Firestore limit)
     const batch = uids.slice(i, i + 10);
     let query = db.collection('items')
       .where('userId', 'in', batch)
       .where('isPublic', '==', true)
       .orderBy('timestamp', 'desc')
-      .limit(20);  // 20 per batch
-
+      .limit(20); // 20 per batch
     if (startAfterDoc) {
-      query = query.startAfter(startAfterDoc);  // Next page magic!
+      query = query.startAfter(startAfterDoc); // Next page magic!
     }
-
     const snap = await query.get();
     if (snap.empty && startAfterDoc) {
-      setHasMore(false);  // No more!
+      setHasMore(false); // No more!
       break;
     }
-
     const items = await Promise.all(
       snap.docs.map(async doc => {
         const data = doc.data();
@@ -1005,21 +1053,17 @@ const batches = [];
     );
     allNewItems.push(...items);
   }
-
   // Sort newest first
   allNewItems.sort((a, b) => b.timestamp - a.timestamp);
-
   // Add to state: Replace if first load, append if more
   setPublicItems(prev => startAfterDoc ? [...prev, ...allNewItems] : allNewItems);
-
   // Update bookmark & comments
- if (allNewItems.length > 0 && snap.docs.length > 0) {
-    setLastDoc(snap.docs[snap.docs.length - 1]);  // Last item as next start
+  if (allNewItems.length > 0 && snap?.docs?.length > 0) {  // Safe check for snap
+    setLastDoc(snap.docs[snap.docs.length - 1]); // Last item as next start
   } else {
     setHasMore(false);
   }
-  await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems);  // Load comments for new ones
-
+  await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems); // Load comments for new ones
   setLoadingMore(false);
 };
   const searchUsers = async q => {
@@ -1040,14 +1084,77 @@ const batches = [];
     setFollowing([...following, targetId]);
     showMessage('Now following');
   };
+      const unfollowUser = async targetId => {
+  await db.collection('follows').doc(`${user.uid}_follows_${targetId}`).delete();
+  setFollowing(following.filter(id => id !== targetId));
+  showMessage('Unfollowed');
+  if (view === 'public') loadPublicFeed(null);  // Updated: Pass null for fresh load
+};
 
-  const unfollowUser = async targetId => {
-    await db.collection('follows').doc(`${user.uid}_follows_${targetId}`).delete();
-    setFollowing(following.filter(id => id !== targetId));
-    showMessage('Unfollowed');
-    if (view === 'public') loadPublicFeed();
-  };
-
+// The clean loadPublicFeed function
+const loadPublicFeed = async (startAfterDoc = null) => {
+  if (loadingMore && startAfterDoc) return; // Don't double-load
+  setLoadingMore(true);
+  const uids = [user.uid, ...following]; // Your users (self + follows)
+  if (!uids.length) {
+    setPublicItems([]);
+    setLoadingMore(false);
+    setHasMore(false);
+    return;
+  }
+  let allNewItems = []; // Collect items from batches
+  for (let i = 0; i < uids.length; i += 10) { // Batch UIDs (Firestore limit)
+    const batch = uids.slice(i, i + 10);
+    let query = db.collection('items')
+      .where('userId', 'in', batch)
+      .where('isPublic', '==', true)
+      .orderBy('timestamp', 'desc')
+      .limit(20); // 20 per batch
+    if (startAfterDoc) {
+      query = query.startAfter(startAfterDoc); // Next page magic!
+    }
+    const snap = await query.get();
+    if (snap.empty && startAfterDoc) {
+      setHasMore(false); // No more!
+      break;
+    }
+    const items = await Promise.all(
+      snap.docs.map(async doc => {
+        const data = doc.data();
+        const uDoc = await db.collection('users').doc(data.userId).get();
+        const u = uDoc.data() || {};
+        return {
+          id: doc.id,
+          ...data,
+          userName: u.displayName || 'Anonymous',
+          isOwnItem: data.userId === user.uid
+        };
+      })
+    );
+    allNewItems.push(...items);
+  }
+  // Sort newest first
+  allNewItems.sort((a, b) => b.timestamp - a.timestamp);
+  // Add to state: Replace if first load, append if more
+  setPublicItems(prev => startAfterDoc ? [...prev, ...allNewItems] : allNewItems);
+  // Update bookmark & comments
+  if (allNewItems.length > 0 && snap?.docs?.length > 0) { // Safe check for snap
+    setLastDoc(snap.docs[snap.docs.length - 1]); // Last item as next start
+  } else {
+    setHasMore(false);
+  }
+  await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems); // Load comments for new ones
+  setLoadingMore(false);
+};
+const loadMyItems = async uid => {
+  const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
+  setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  loadComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+};
+const loadFollowing = async uid => {
+  const snap = await db.collection('follows').where('followerId', '==', uid).get();
+  setFollowing(snap.docs.map(d => d.data().followingId));
+};
   const addItem = async rating => {
     if (!inputText.trim() || isProcessing) return;
     setIsProcessing(true);
@@ -1068,17 +1175,22 @@ const batches = [];
         }
       }
 
-      const cat = await detectCategory(inputText, userLat, userLng);
-      
-      const payload = {
-        text: inputText.trim(),
-        rating,
-        category: cat,
-        timestamp: Date.now(),
-        date: new Date().toLocaleDateString(),
-        userId: user.uid,
-        isPublic: true
-      };
+const result = await detectCategory(inputText, userLat, userLng);
+const cat = typeof result === 'string' ? result : result.category;
+const geoLat = typeof result === 'object' ? result.lat : null;
+const geoLng = typeof result === 'object' ? result.lng : null;
+
+const payload = {
+  text: inputText.trim(),
+  rating,
+  category: cat,
+  timestamp: Date.now(),
+  date: new Date().toLocaleDateString(),
+  userId: user.uid,
+  isPublic: true,
+  geoLat,  // NEW
+  geoLng   // NEW
+};
       const ref = await db.collection('items').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
       setItems(prev => [{ id: ref.id, ...payload }, ...prev]);
       setInputText('');
@@ -1336,6 +1448,8 @@ const batches = [];
                   item={itm}
                   view={view}
                   currentUser={user}
+                     userLat={userLat}  // NEW
+  userLng={userLng}  // NEW
                   onVisitProfile={visitProfile}
                   onUpdate={handleUpdate}
   onDelete={handleDelete}
@@ -1364,10 +1478,17 @@ const batches = [];
           </div>
         )}
           {/*main page footer*/}
-           <div className="mt-8 text-center pb-4">
-          <a href="https://yvonnebuttle.github.io/binary/privacy.html" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-500 hover:text-purple-600">
-            Privacy Policy
-          </a>
+          <div className="mt-8 text-center pb-4">
+  <a href="https://yvonnebuttle.github.io/binary/privacy.html" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-500 hover:text-purple-600">
+    Privacy Policy
+  </a>
+  {' | '}
+  <a
+    href={`mailto:yvonnebuttle1@gmail.com?subject=Binary%20App%20Bug%20-%20${navigator.userAgent}&body=Hi!%20I%20found%20a%20bug%20on%20${new Date().toLocaleDateString()}.%0A%0ADescribe%20it%20here:%0A%0ASteps:%201.%20...%202.%20...%0A%0ADevice/Browser:%20${navigator.userAgent.substring(0, 100)}`}  // Swap email!
+    className="text-sm text-gray-500 hover:text-purple-600"
+  >
+    Report Bug
+  </a>
         </div>
       </div>
     </div>
