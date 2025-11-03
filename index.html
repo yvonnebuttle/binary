@@ -479,16 +479,26 @@ const sendReply = async () => {
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
-  const ref = await db.collection(COMMENTS_COLLECTION).add(payload);
-  const newComment = { id: ref.id, ...payload, createdAt: new Date() };
+  try {
+    const ref = await db.collection(COMMENTS_COLLECTION).add(payload);
+    const newComment = {
+      id: ref.id,
+      ...payload,
+      createdAt: new Date() // fallback for display
+    };
 
-  setComments(prev => ({
-    ...prev,
-    [item.id]: [...(prev[item.id] || []), newComment]
-  }));
+    // Use the passed setComments from parent
+    setComments(prev => ({
+      ...prev,
+      [item.id]: [...(prev[item.id] || []), newComment]
+    }));
 
-  setReplyText('');
-  setEditingReply(false);
+    setReplyText('');
+    setEditingReply(false);
+  } catch (error) {
+    console.error('Failed to add comment:', error);
+    alert('Failed to post comment. Check console.');
+  }
 };
   return (
     <div className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
