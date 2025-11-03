@@ -601,11 +601,11 @@ const [comments, setComments] = useState({});           // { itemId: [{…}] }
     setTimeout(() => setMessage(null), 3000);
   };
     
-    +// === NEW: Load comments for a list of items ===
+    // === NEW: Load comments for a list of items ===
 +const loadComments = async (itemList) => {
 +  const itemIds = itemList.map(i => i.id);
 +  if (!itemIds.length) return;
-+  const snap = await db.collection('comments')
++  const snap = await db.collection(COMMENTS_COLLECTION)
 +    .where('itemId', 'in', itemIds)
 +    .orderBy('createdAt', 'asc')
 +    .get();
