@@ -772,6 +772,10 @@ function BinaryApp() {
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+        // === infinte scroll ===
+    const [hasMore, setHasMore] = useState(true);  // True if more items to load
+const [lastDoc, setLastDoc] = useState(null);  // "Bookmark" for next page
+const [loadingMore, setLoadingMore] = useState(false);  // Spinner flag
         // === SWIPE GESTURE STATES ===
     const [touchStart, setTouchStart] = useState(null);
 const [touchEnd, setTouchEnd] = useState(null);
@@ -956,63 +960,68 @@ const batches = [];
         if (error.code !== 'auth/no-redirect-result') {
           console.error('Redirect error:', error);
           showMessage('Sign-in error. Please try again.', 'error');
-        }
-      }
-    };
+        }const loadPublicFeed = async (startAfterDoc = null) => {
+  if (loadingMore && startAfterDoc) return;  // Don't double-load
+  setLoadingMore(true);
+  const uids = [user.uid, ...following];  // Your users (self + follows)
+  if (!uids.length) { 
+    setPublicItems([]); 
+    setLoadingMore(false); 
+    setHasMore(false); 
+    return; 
+  }
 
-    checkRedirect();
+  let allNewItems = [];  // Collect items from batches
+  for (let i = 0; i < uids.length; i += 10) {  // Batch UIDs (Firestore limit)
+    const batch = uids.slice(i, i + 10);
+    let query = db.collection('items')
+      .where('userId', 'in', batch)
+      .where('isPublic', '==', true)
+      .orderBy('timestamp', 'desc')
+      .limit(20);  // 20 per batch
 
-    return () => unsub();
-  }, []);
-
-  // Public feed reload
-  useEffect(() => {
-    if (view === 'public' && user) loadPublicFeed();
-  }, [view, following, user]);
-
-  const loadMyItems = async uid => {
-    const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
-    setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      loadComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  };
-
-  const loadFollowing = async uid => {
-    const snap = await db.collection('follows').where('followerId', '==', uid).get();
-    setFollowing(snap.docs.map(d => d.data().followingId));
-  };
-
-  const loadPublicFeed = async () => {
-    const uids = [user.uid, ...following];
-    if (!uids.length) { setPublicItems([]); return; }
-    const batches = [];
-    for (let i = 0; i < uids.length; i += 10) {
-      const batch = uids.slice(i, i + 10);
-      const snap = await db.collection('items')
-        .where('userId', 'in', batch)
-        .where('isPublic', '==', true)
-        .orderBy('timestamp', 'desc')
-        .limit(50)
-        .get();
-      const items = await Promise.all(
-        snap.docs.map(async doc => {
-          const data = doc.data();
-          const uDoc = await db.collection('users').doc(data.userId).get();
-          const u = uDoc.data() || {};
-          return {
-            id: doc.id,
-            ...data,
-            userName: u.displayName || 'Anonymous',
-            isOwnItem: data.userId === user.uid
-          };
-        })
-      );
-      batches.push(...items);
+    if (startAfterDoc) {
+      query = query.startAfter(startAfterDoc);  // Next page magic!
     }
-    batches.sort((a, b) => b.timestamp - a.timestamp);
-    setPublicItems(batches.slice(0, 50));
-      loadComments(batches.slice(0, 50));
-  };
 
+    const snap = await query.get();
+    if (snap.empty && startAfterDoc) {
+      setHasMore(false);  // No more!
+      break;
+    }
+
+    const items = await Promise.all(
+      snap.docs.map(async doc => {
+        const data = doc.data();
+        const uDoc = await db.collection('users').doc(data.userId).get();
+        const u = uDoc.data() || {};
+        return {
+          id: doc.id,
+          ...data,
+          userName: u.displayName || 'Anonymous',
+          isOwnItem: data.userId === user.uid
+        };
+      })
+    );
+    allNewItems.push(...items);
+  }
+
+  // Sort newest first
+  allNewItems.sort((a, b) => b.timestamp - a.timestamp);
+
+  // Add to state: Replace if first load, append if more
+  setPublicItems(prev => startAfterDoc ? [...prev, ...allNewItems] : allNewItems);
+
+  // Update bookmark & comments
+ if (allNewItems.length > 0 && snap.docs.length > 0) {
+    setLastDoc(snap.docs[snap.docs.length - 1]);  // Last item as next start
+  } else {
+    setHasMore(false);
+  }
+  await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems);  // Load comments for new ones
+
+  setLoadingMore(false);
+};
   const searchUsers = async q => {
     const snap = await db.collection('users').get();
     const hits = snap.docs
