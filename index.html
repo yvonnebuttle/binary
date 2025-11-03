@@ -1103,6 +1103,7 @@ const loadFollowing = async uid => {
       }
 const result = await detectCategory(inputText, userLat, userLng);
 const cat = typeof result === 'string' ? result : result.category;
+console.log('📊 CATEGORIZATION RESULT:', { input: inputText, result, finalCategory: cat, method: typeof result === 'object' ? 'Google Maps' : result === categoryCache[normalizeForCache(inputText)] ? 'Cache' : 'AI/Keywords' });
 const geoLat = typeof result === 'object' ? result.lat : null;
 const geoLng = typeof result === 'object' ? result.lng : null;
 const payload = {
