@@ -1017,7 +1017,7 @@ useEffect(() => {
     if (startAfterDoc) {
       query = query.startAfter(startAfterDoc); // Next page magic!
     }
-    snap = await query.get();
+    const snap = await query.get();
     if (snap.empty && startAfterDoc) {
       setHasMore(false); // No more!
       break;
