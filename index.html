@@ -42,7 +42,6 @@ try {
 } catch (error) {
   console.error("Firebase initialization error:", error);
 }
-
 // === SVG icons ===
 const ThumbsUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>;
 const ThumbsDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>;
@@ -71,7 +70,7 @@ function saveCache() {
   try { localStorage.setItem("categoryCache", JSON.stringify(categoryCache)); }
   catch(err){ console.warn(err); }
 }
-    // Normalize text for cache lookups
+// Normalize text for cache lookups
 function normalizeForCache(text) {
   const fillerWords = [
     'a', 'an', 'the', 'at', 'in', 'on', 'to', 'for', 'of', 'with',
@@ -258,7 +257,7 @@ async function classifyWithOpenAI(text) {
   ]
 };
 
-    // === NEW: Comments collection Firebase ===
+    // Comments collection Firebase ===
 const COMMENTS_COLLECTION = 'comments';
     
     // === Mobile detection ===
@@ -266,7 +265,6 @@ const COMMENTS_COLLECTION = 'comments';
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const isAndroid = /Android/.test(navigator.userAgent);
 const isMobile = isIOS || isAndroid;
-
 // IMPROVED PWA detection
 const isInStandaloneMode = () => {
   // Check both display-mode and navigator.standalone for iOS
@@ -294,32 +292,28 @@ function distanceKm(lat1, lon1, lat2, lon2) {
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-// === NEW DETECT CATEGORY FUNCTION WITH CACHING ===
+// ===  DETECT CATEGORY FUNCTION WITH CACHING ===
 async function detectCategory(inputText, userLat, userLng) {
   const text = inputText.trim();
   if (!text) return 'Other';
 
   const lower = text.toLowerCase();
   const normalized = normalizeForCache(text);
-
   // ---- 1. CHECK CACHE FIRST (highest priority) ----
   if (categoryCache[normalized]) {
     console.log('✅ Cache hit:', normalized, '→', categoryCache[normalized]);
     return categoryCache[normalized];
   }
-
   // ---- 2. PROXIMITY CHECK (Google Maps) ----
   if (window.google?.maps && userLat && userLng) {
     try {
       await waitForGoogleMaps();
       const service = new google.maps.places.PlacesService(document.createElement('div'));
-
       const request = {
         query: text,
         location: new google.maps.LatLng(userLat, userLng),
         radius: 2000
       };
-
       const results = await new Promise(resolve => {
         service.textSearch(request, (res, status) => {
           resolve(status === google.maps.places.PlacesServiceStatus.OK ? res || [] : []);
@@ -332,10 +326,8 @@ async function detectCategory(inputText, userLat, userLng) {
           const distB = distanceKm(userLat, userLng, b.geometry.location.lat(), b.geometry.location.lng());
           return distA - distB;
         });
-
         const closest = results[0];
         const dist = distanceKm(userLat, userLng, closest.geometry.location.lat(), closest.geometry.location.lng());
-
    if (dist <= 2) {
   const types = closest.types || [];
   const lat = closest.geometry.location.lat();
@@ -371,8 +363,7 @@ async function detectCategory(inputText, userLat, userLng) {
       console.warn('Proximity error:', e);
     }
   }
-
-  // ---- 3. OPENAI CLASSIFICATION ----
+// ---- 3. OPENAI CLASSIFICATION ----
   console.log('🤖 Calling OpenAI for:', text);
   const aiCategory = await classifyWithOpenAI(text);
   if (aiCategory) {
@@ -381,15 +372,12 @@ async function detectCategory(inputText, userLat, userLng) {
     saveCache();
     return aiCategory;
   }
-
   // ---- 4. KEYWORD FALLBACK ----
   const inputWords = lower.split(/\s+/)
     .map(w => w.replace(/s$/, ''))
     .filter(w => w.length > 2);
-
   const scores = {};
   ALL_CATEGORIES.forEach(c => scores[c] = 0);
-
   for (const word of inputWords) {
     for (const [cat, keywords] of Object.entries(FULL_CATEGORIES)) {
       if (!keywords) continue;
@@ -398,7 +386,6 @@ async function detectCategory(inputText, userLat, userLng) {
       }
     }
   }
-
   let best = 'Other';
   let maxScore = 0;
   for (const [cat, score] of Object.entries(scores)) {
@@ -407,14 +394,12 @@ async function detectCategory(inputText, userLat, userLng) {
       best = cat;
     }
   }
-
   if (maxScore > 0) {
     console.log('✅ Keywords:', best);
     categoryCache[normalized] = best;
     saveCache();
     return best;
   }
-
   // ---- 5. DEFAULT ----
   console.log('❌ No match, defaulting to Other');
   return 'Other';
@@ -828,24 +813,19 @@ const [comments, setComments] = useState({});           // { itemId: [{…}] }
   setTouchEnd(null);
   setTouchStart(e.targetTouches[0].clientX);
 };
-
 const onTouchMove = (e) => {
   setTouchEnd(e.targetTouches[0].clientX);
 };
-
 const onTouchEnd = () => {
   if (!touchStart || !touchEnd) return;
   const distance = touchStart - touchEnd;
   const isLeftSwipe = distance > minSwipeDistance;
   const isRightSwipe = distance < -minSwipeDistance;
-
   if (isLeftSwipe && view === 'my') setView('public');
   if (isRightSwipe && view === 'public') setView('my');
-
   setTouchStart(null);
   setTouchEnd(null);
 };
-
   const showMessage = (txt, type = 'success') => {
     setMessage({ txt, type });
     setTimeout(() => setMessage(null), 3000);
@@ -874,7 +854,6 @@ const batches = [];
   setComments(prev => ({ ...prev, ...map }));
       }
       };
-
   const signOut = async () => {
     try {
       await auth.signOut();
@@ -887,7 +866,6 @@ const batches = [];
       console.error('Sign out error:', error);
     }
   };
-
   // Helper to save user data
   const saveUserToFirestore = async (user) => {
     await db.collection('users').doc(user.uid).set({
@@ -897,7 +875,6 @@ const batches = [];
       lastLogin: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   };
-
   // IMPROVED SIGN-IN FUNCTION
   const signInWithGoogle = async () => {
     try {
@@ -907,9 +884,7 @@ const batches = [];
         // Force fresh authentication
         auth_type: 'reauthenticate'
       });
-
       console.log('Device info:', { isIOS, isAndroid, isMobile, isPWA: isInStandaloneMode() });
-
       // iOS PWA: Always use popup (most reliable)
       if (isIOS && isInStandaloneMode()) {
         console.log('iOS PWA → using popup');
@@ -927,27 +902,28 @@ const batches = [];
         }
         return;
       }
-
       // iOS Safari (not PWA): Use redirect (popup often fails)
       if (isIOS && !isInStandaloneMode()) {
         console.log('iOS Safari → using redirect');
         await auth.signInWithRedirect(provider);
         return;
       }
-
       // Android: Always use redirect
       if (isAndroid) {
         console.log('Android → using redirect');
         await auth.signInWithRedirect(provider);
         return;
       }
-
       // Desktop: Use popup
       console.log('Desktop → using popup');
       const result = await auth.signInWithPopup(provider);
       await saveUserToFirestore(result.user);
       showMessage('Welcome!');
-
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      showMessage('Sign-in failed. Try again?', 'error');
+    }
+  };
  // Auth observer with redirect handling
 useEffect(() => {
   const unsub = auth.onAuthStateChanged(async (u) => {
@@ -959,8 +935,29 @@ useEffect(() => {
     }
    
     setIsLoading(false);
-  });
-
+    });
+    return () => unsub();
+  }, []);
+     // Handle redirect result ONCE after auth is ready
+    useEffect(() => {
+      const checkRedirect = async () => {
+      try {
+        const result = await auth.getRedirectResult();
+        if (result && result.user) {
+          console.log('Redirect result found:', result.user.uid);
+          await saveUserToFirestore(result.user);
+          showMessage('Signed in successfully!');
+        }
+      } catch (error) {
+        // Ignore "no redirect result" error (expected on normal page loads)
+        if (error.code !== 'auth/no-redirect-result') {
+          console.error('Redirect error:', error);
+          showMessage('Sign-in error. Please try again.', 'error');
+        }
+      }
+    };
+    checkRedirect();
+  }, []);
     // Public feed reload with reset
 useEffect(() => {
   if (view === 'public' && user) {
@@ -970,7 +967,6 @@ useEffect(() => {
     loadPublicFeed();
   }
 }, [view, following, user]);
-
 // Infinite scroll observer
 useEffect(() => {
   if (view !== 'public' || !hasMore || publicItems.length === 0 || loadingMore) return;
@@ -985,29 +981,7 @@ useEffect(() => {
   const lastItemEl = document.querySelector('.space-y-3 > *:last-child');
   if (lastItemEl) observer.observe(lastItemEl);
   return () => observer.disconnect();
-}, [publicItems, lastDoc, hasMore, loadingMore, view]);
-    
-  // Handle redirect result ONCE after auth is ready
-  const checkRedirect = async () => {
-    try {
-      const result = await auth.getRedirectResult();
-      if (result && result.user) {
-        console.log('Redirect result found:', result.user.uid);
-        await saveUserToFirestore(result.user);
-        showMessage('Signed in successfully!');
-      }
-    } catch (error) {
-      // Ignore "no redirect result" error (expected on normal page loads)
-      if (error.code !== 'auth/no-redirect-result') {
-        console.error('Redirect error:', error);
-        showMessage('Sign-in error. Please try again.', 'error');
-      }
-    }
-  };
-  checkRedirect();  // Call it here (if missing)
-  return () => unsub();
-}, []);  // Empty deps for once-on-load
-
+}, [publicItems, lastDoc, hasMore, loadingMore, view]); 
     // Get user location once on mount
 useEffect(() => {
   if (navigator.geolocation) {
@@ -1021,7 +995,17 @@ useEffect(() => {
     );
   }
 }, []);
-        
+    //public feed
+    const loadPublicFeed = async (startAfterDoc = null) => {
+    if (loadingMore && startAfterDoc) return; // Don't double-load
+    setLoadingMore(true);
+    const uids = [user.uid, ...following]; // Your users (self + follows)
+    if (!uids.length) {
+      setPublicItems([]);
+      setLoadingMore(false);
+      setHasMore(false);
+      return;
+    }
   let allNewItems = []; // Collect items from batches
   for (let i = 0; i < uids.length; i += 10) { // Batch UIDs (Firestore limit)
     const batch = uids.slice(i, i + 10);
@@ -1033,7 +1017,7 @@ useEffect(() => {
     if (startAfterDoc) {
       query = query.startAfter(startAfterDoc); // Next page magic!
     }
-    const snap = await query.get();
+    snap = await query.get();
     if (snap.empty && startAfterDoc) {
       setHasMore(false); // No more!
       break;
@@ -1066,6 +1050,15 @@ useEffect(() => {
   await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems); // Load comments for new ones
   setLoadingMore(false);
 };
+    const loadMyItems = async uid => {
+  const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
+  setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  loadComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+};
+const loadFollowing = async uid => {
+  const snap = await db.collection('follows').where('followerId', '==', uid).get();
+  setFollowing(snap.docs.map(d => d.data().followingId));
+};
   const searchUsers = async q => {
     const snap = await db.collection('users').get();
     const hits = snap.docs
@@ -1073,7 +1066,6 @@ useEffect(() => {
       .filter(u => u.id !== user?.uid && (u.displayName?.toLowerCase().includes(q.toLowerCase()) || u.email?.toLowerCase().includes(q.toLowerCase())));
     setSearchResults(hits);
   };
-
   const followUser = async targetId => {
     if (following.includes(targetId)) return showMessage('Already following');
     await db.collection('follows').doc(`${user.uid}_follows_${targetId}`).set({
@@ -1090,72 +1082,7 @@ useEffect(() => {
   showMessage('Unfollowed');
   if (view === 'public') loadPublicFeed(null);  // Updated: Pass null for fresh load
 };
-
-// The clean loadPublicFeed function
-const loadPublicFeed = async (startAfterDoc = null) => {
-  if (loadingMore && startAfterDoc) return; // Don't double-load
-  setLoadingMore(true);
-  const uids = [user.uid, ...following]; // Your users (self + follows)
-  if (!uids.length) {
-    setPublicItems([]);
-    setLoadingMore(false);
-    setHasMore(false);
-    return;
-  }
-  let allNewItems = []; // Collect items from batches
-  for (let i = 0; i < uids.length; i += 10) { // Batch UIDs (Firestore limit)
-    const batch = uids.slice(i, i + 10);
-    let query = db.collection('items')
-      .where('userId', 'in', batch)
-      .where('isPublic', '==', true)
-      .orderBy('timestamp', 'desc')
-      .limit(20); // 20 per batch
-    if (startAfterDoc) {
-      query = query.startAfter(startAfterDoc); // Next page magic!
-    }
-    const snap = await query.get();
-    if (snap.empty && startAfterDoc) {
-      setHasMore(false); // No more!
-      break;
-    }
-    const items = await Promise.all(
-      snap.docs.map(async doc => {
-        const data = doc.data();
-        const uDoc = await db.collection('users').doc(data.userId).get();
-        const u = uDoc.data() || {};
-        return {
-          id: doc.id,
-          ...data,
-          userName: u.displayName || 'Anonymous',
-          isOwnItem: data.userId === user.uid
-        };
-      })
-    );
-    allNewItems.push(...items);
-  }
-  // Sort newest first
-  allNewItems.sort((a, b) => b.timestamp - a.timestamp);
-  // Add to state: Replace if first load, append if more
-  setPublicItems(prev => startAfterDoc ? [...prev, ...allNewItems] : allNewItems);
-  // Update bookmark & comments
-  if (allNewItems.length > 0 && snap?.docs?.length > 0) { // Safe check for snap
-    setLastDoc(snap.docs[snap.docs.length - 1]); // Last item as next start
-  } else {
-    setHasMore(false);
-  }
-  await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems); // Load comments for new ones
-  setLoadingMore(false);
-};
-const loadMyItems = async uid => {
-  const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
-  setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  loadComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-};
-const loadFollowing = async uid => {
-  const snap = await db.collection('follows').where('followerId', '==', uid).get();
-  setFollowing(snap.docs.map(d => d.data().followingId));
-};
-  const addItem = async rating => {
+    const addItem = async rating => {
     if (!inputText.trim() || isProcessing) return;
     setIsProcessing(true);
     try {
@@ -1174,12 +1101,10 @@ const loadFollowing = async uid => {
           console.warn('Location unavailable:', geoError);
         }
       }
-
 const result = await detectCategory(inputText, userLat, userLng);
 const cat = typeof result === 'string' ? result : result.category;
 const geoLat = typeof result === 'object' ? result.lat : null;
 const geoLng = typeof result === 'object' ? result.lng : null;
-
 const payload = {
   text: inputText.trim(),
   rating,
@@ -1202,19 +1127,16 @@ const payload = {
       setIsProcessing(false); 
     }
   };
-
   const deleteItem = async id => {
     await db.collection('items').doc(id).delete();
     setItems(prev => prev.filter(i => i.id !== id));
     showMessage('Deleted');
   };
-
   const togglePublic = async (id, cur) => {
     await db.collection('items').doc(id).update({ isPublic: !cur });
     setItems(prev => prev.map(i => i.id === id ? { ...i, isPublic: !cur } : i));
     showMessage(cur ? 'Now private' : 'Now public');
   };
-
   const visitProfile = uid => {
     if (!following.includes(uid)) {
       showMessage('Follow this user first to view their page', 'error');
@@ -1223,19 +1145,16 @@ const payload = {
     setView('profile');
     setProfileTarget(uid);
   };
-
   const backFromProfile = () => {
     setView('public');
     setProfileTarget(null);
   };
-
   const currentItems = view === 'my' ? items : view === 'public' ? publicItems : [];
   const filteredItems = useMemo(() => {
     if (selectedCategory === 'All') return currentItems;
     return currentItems.filter(i => i.category === selectedCategory);
   }, [currentItems, selectedCategory]);
-
-  // Login Screen
+ // Login Screen
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center px-4">
@@ -1269,13 +1188,10 @@ const payload = {
       </div>
     );
   }
-
   if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
-
   if (view === 'profile' && profileTarget) {
     return <UserProfile targetUid={profileTarget} onBack={backFromProfile} currentUser={user} />;
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
 <div 
@@ -1327,7 +1243,6 @@ const payload = {
             </div>
           </div>
         )}
-
         {/* Header */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -1337,7 +1252,6 @@ const payload = {
           </div>
           <p className="text-gray-600">Welcome, {user.displayName}!</p>
         </div>
-
         {/* View Toggle */}
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
           <div className="flex gap-2">
@@ -1349,7 +1263,6 @@ const payload = {
             </button>
           </div>
         </div>
-
         {/* Input */}
         {view === 'my' && (
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -1384,7 +1297,6 @@ const payload = {
             </div>
           </div>
         )}
-
         {/* Filter */}
         {currentItems.length > 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
@@ -1401,7 +1313,6 @@ const payload = {
             </div>
           </div>
         )}
-
         {/* Items list */}
         <div className="space-y-3">
           {filteredItems.length === 0 ? (
@@ -1433,7 +1344,6 @@ const payload = {
                   setPublicItems(prev => prev.map(i => (i.id === updatedItem.id ? updatedItem : i)));
                 }
               };
-
               const handleDelete = id => {
                 if (view === 'my') {
                   setItems(prev => prev.filter(i => i.id !== id));
@@ -1441,15 +1351,14 @@ const payload = {
                   setPublicItems(prev => prev.filter(i => i.id !== id));
                 }
               };
-
               return (
-                <ItemCard
+                  <ItemCard
                   key={itm.id}
                   item={itm}
                   view={view}
                   currentUser={user}
-                     userLat={userLat}  // NEW
-  userLng={userLng}  // NEW
+                     userLat={userLat} // NEW
+  userLng={userLng} // NEW
                   onVisitProfile={visitProfile}
                   onUpdate={handleUpdate}
   onDelete={handleDelete}
@@ -1460,8 +1369,7 @@ const payload = {
             })
           )}
         </div>
-
-        {/* Stats */}
+     {/* Stats */}
         {view === 'my' && items.length > 0 && (
           <div className="mt-6 bg-white rounded-2xl shadow-lg p-6">
             <h3 className="font-bold text-gray-800 mb-3">Your Stats</h3>
@@ -1494,9 +1402,41 @@ const payload = {
     </div>
   );
 }
+    // Simple Error Boundary (wraps the app to catch render errors) ACTUALLY new
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('App render error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-red-50">
+          <div className="text-center p-8 bg-white rounded-lg shadow">
+            <h2 className="text-red-600 mb-4">Oops! Something broke.</h2>
+            <p className="text-gray-600 mb-4">Error: {this.state.error?.message || 'Unknown'}</p>
+            <button onClick={() => window.location.reload()} className="bg-red-500 text-white px-4 py-2 rounded">Reload App</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 // Render App (react 18)
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<BinaryApp />);
+root.render(
+    <ErrorBoundary>
+    <BinaryApp />
+  </ErrorBoundary>
+);
+    console.log('App mounted!');
 </script>
 </body>
 </html>
