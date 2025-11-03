@@ -612,23 +612,21 @@ const sendReply = async () => {
       </div>
 
 {/* === PUBLIC COMMENTS SECTION === */}
-        {item.isPublic && (
-          <div className="mt-4 border-t pt-3">
-         {/* === SUBTLE PUBLIC COMMENTS (like owner comment) === */}
 {item.isPublic && (
-  <div className="mt-3 border-t pt-3">
-    ...
-  </div>
-)}
-            {/* Comment List */}
-            <div className="space-y-2">
-              ...
-            </div>
-          </div>
-        )}
+  <div className="mt-4 border-t pt-3">
+    {/* Comment List */}
+    <div className="space-y-2 mb-3">
+      {(comments[item.id] || []).map(c => (
+        <div key={c.id} className="flex items-start gap-2 text-sm">
+          <div className="font-medium text-purple-700">{c.userName}:</div>
+          <div className="text-gray-700">{c.text}</div>
+        </div>
+      ))}
+      {comments[item.id]?.length === 0 && (
+        <p className="text-xs text-gray-400 italic">No comments yet</p>
+      )}
     </div>
-  );
-
+      
     {/* Add comment trigger */}
     {editingReply ? (
       <div className="flex gap-1.5 items-center mt-2">
@@ -667,23 +665,6 @@ const sendReply = async () => {
     )}
   </div>
 )}
-            {/* Comment List */}
-            <div className="space-y-2">
-              {(comments[item.id] || []).map(c => (
-                <div key={c.id} className="flex items-start gap-2 text-sm">
-                  <div className="font-medium text-purple-700">{c.userName}:</div>
-                  <div className="text-gray-700">{c.text}</div>
-                </div>
-              ))}
-              {comments[item.id]?.length === 0 && (
-                <p className="text-xs text-gray-400 italic">No comments yet</p>
-              )}
-            </div>
-          </div>
-        )}
-    </div>
-  );
-}
 // === MAIN APP ===
 function BinaryApp() {
   const [user, setUser] = useState(null);
