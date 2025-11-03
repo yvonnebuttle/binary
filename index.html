@@ -312,31 +312,40 @@ if (window.google?.maps && userLat && userLng) {
   }
 }
 // → If no valid place < 2km, fall through to keyword matching (unchanged)
-  // ---- 2. KEYWORD FALLBACK (IMPROVED) ----
-  if (categoryCache[text]) return categoryCache[text];
 
-  const scores = {};
-  ALL_CATEGORIES.forEach(c => scores[c] = 0);
+ // ---- 2. KEYWORD FALLBACK (EXACT WORD MATCH ONLY) ----
+if (categoryCache[text]) return categoryCache[text];
 
-  for (const [cat, words] of Object.entries(FULL_CATEGORIES)) {
-    if (!words) continue;
-    let hits = 0;
-    const inputWords = lower.split(/\s+/);
-    for (const w of inputWords) {
-      // PARTIAL MATCH (e.g. "eating" → "ate")
-      if (words.some(k => k.includes(w) || w.includes(k))) hits++;
+const inputWords = lower.split(/\s+/)
+  .map(w => w.replace(/s$/, ''))  // Remove trailing 's'
+  .filter(w => w.length > 2);
+
+const scores = {};
+ALL_CATEGORIES.forEach(c => scores[c] = 0);
+
+for (const word of inputWords) {
+  for (const [cat, keywords] of Object.entries(FULL_CATEGORIES)) {
+    if (!keywords) continue;
+    if (keywords.includes(word)) {
+      scores[cat] += 1;
     }
-    if (hits) scores[cat] = hits;  // ← Raw hits (1 hit = 1 point)
   }
-
-  const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
-  let [best, score] = sorted[0] || ['Other', 0];
-  if (score === 0) best = 'Other';  // ← Only "Other" if NO hits
-
-  categoryCache[text] = best;
-  saveCache();
-  return best;
 }
+
+let best = 'Other';
+let maxScore = 0;
+for (const [cat, score] of Object.entries(scores)) {
+  if (score > maxScore) {
+    maxScore = score;
+    best = cat;
+  }
+}
+
+categoryCache[text] = best;
+saveCache();
+return best;
+}
+    
 // === NEW: UserProfile Component ===
 function UserProfile({ targetUid, onBack, currentUser }) {
   const [profileUser, setProfileUser] = useState(null);
@@ -409,7 +418,10 @@ function UserProfile({ targetUid, onBack, currentUser }) {
   );
 }
 // === ItemCard ===
-function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete }) {
+function ItemCard({ 
+  item, view, currentUser, onVisitProfile, onUpdate, onDelete,
+  commentInputs, setCommentInputs, comments, setComments 
+}) {
   const [editingComment, setEditingComment] = useState(false);
   const [commentText, setCommentText] = useState(item.comment || '');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -450,6 +462,29 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
     await db.collection('items').doc(item.id).delete();
     onDelete(item.id);
   };
+    // === SEND COMMENT ===
+const sendComment = async () => {
+  const txt = (commentInputs[item.id] || '').trim();
+  if (!txt || txt.length > 120) return;
+
+  const payload = {
+    itemId: item.id,
+    text: txt,
+    userId: currentUser.uid,
+    userName: currentUser.displayName,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  const ref = await db.collection(COMMENTS_COLLECTION).add(payload);
+  const newComment = { id: ref.id, ...payload, createdAt: new Date() };
+
+  setComments(prev => ({
+    ...prev,
+    [item.id]: [...(prev[item.id] || []), newComment]
+  }));
+
+  setCommentInputs(prev => ({ ...prev, [item.id]: '' }));
+};
   return (
     <div className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between">
@@ -572,6 +607,46 @@ function ItemCard({ item, view, currentUser, onVisitProfile, onUpdate, onDelete 
           </button>
         )}
       </div>
+                {/* === PUBLIC COMMENTS SECTION === */}
+        {item.isPublic && (
+          <div className="mt-4 border-t pt-3">
+            {/* Comment Input */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                placeholder="Add a comment... (max 120 chars)"
+                value={commentInputs[item.id] || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val.length <= 120) {
+                    setCommentInputs(prev => ({ ...prev, [item.id]: val }));
+                  }
+                }}
+                className="flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:border-purple-400"
+              />
+              <button
+                onClick={sendComment}
+                disabled={!commentInputs[item.id]?.trim() || (commentInputs[item.id]?.length > 120)}
+                className="px-4 py-1.5 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 text-white text-sm font-medium rounded-lg"
+              >
+                Send
+              </button>
+            </div>
+
+            {/* Comment List */}
+            <div className="space-y-2">
+              {(comments[item.id] || []).map(c => (
+                <div key={c.id} className="flex items-start gap-2 text-sm">
+                  <div className="font-medium text-purple-700">{c.userName}:</div>
+                  <div className="text-gray-700">{c.text}</div>
+                </div>
+              ))}
+              {comments[item.id]?.length === 0 && (
+                <p className="text-xs text-gray-400 italic">No comments yet</p>
+              )}
+            </div>
+          </div>
+        )}
     </div>
   );
 }
@@ -1123,7 +1198,11 @@ const loadComments = async (itemList) => {
                   currentUser={user}
                   onVisitProfile={visitProfile}
                   onUpdate={handleUpdate}
-                  onDelete={handleDelete}
+  onDelete={handleDelete}
+  commentInputs={commentInputs}
+  setCommentInputs={setCommentInputs}
+  comments={comments}
+  setComments={setComments}
                 />
               );
             })
