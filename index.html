@@ -356,13 +356,13 @@ async function detectCategory(inputText, userLat, userLng) {
         if (dist <= 2) {
           const types = closest.types || [];
 
-          if (types.includes('restaurant') || types.includes('food') || types.includes('meal_takeaway')) {
+          if (types.includes('restaurant') || types.includes('food') || types.includes('meal_takeaway') || types.includes('bakery')) {
             console.log('✅ Google Maps: Food');
             categoryCache[normalized] = 'Food';
             saveCache();
             return 'Food';
           }
-          if (types.includes('cafe') || types.includes('coffee_shop')) {
+          if (types.includes('coffee_shop') || types.includes('cafe')) {
             console.log('✅ Google Maps: Coffee');
             categoryCache[normalized] = 'Coffee';
             saveCache();
@@ -374,7 +374,7 @@ async function detectCategory(inputText, userLat, userLng) {
             saveCache();
             return 'Pints';
           }
-          if (types.some(t => ['museum', 'park', 'tourist_attraction', 'point_of_interest'].includes(t))) {
+          if (types.some(t => ['museum', 'park', 'tourist_attraction'].includes(t))) {
             console.log('✅ Google Maps: Places');
             categoryCache[normalized] = 'Places';
             saveCache();
