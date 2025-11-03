@@ -488,10 +488,10 @@ const sendReply = async () => {
     };
 
     // Use the passed setComments from parent
-    setComments(prev => ({
-      ...prev,
-      [item.id]: [...(prev[item.id] || []), newComment]
-    }));
+setComments(prev => ({
+  ...prev,
+  [item.id]: [...(prev?.[item.id] || []), newComment]
+}));
 
     setReplyText('');
     setEditingReply(false);
@@ -628,13 +628,13 @@ const sendReply = async () => {
         <div className="mt-4 border-t pt-3">
           {/* Comment List */}
           <div className="space-y-2 mb-3">
-            {(comments[item.id] || []).map(c => (
+         {(comments?.[item.id] || []).map(c => (
               <div key={c.id} className="flex items-start gap-2 text-sm">
                 <div className="font-medium text-purple-700">{c.userName}:</div>
                 <div className="text-gray-700">{c.text}</div>
               </div>
             ))}
-            {comments[item.id]?.length === 0 && (
+            {(!comments?.[item.id] || comments[item.id]?.length === 0) && (
               <p className="text-xs text-gray-400 italic">No comments yet</p>
             )}
           </div>
