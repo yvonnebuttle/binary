@@ -593,7 +593,7 @@ const sendReply = async () => {
                 Cancel
               </button>
             </div>
-          ) : isOwn && (
+          ) : isOwn && !item.isPublic && (
             <button
               onClick={() => setEditingComment(true)}
               className="mt-2 text-xs text-purple-600 hover:underline"
