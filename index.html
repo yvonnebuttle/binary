@@ -1108,12 +1108,13 @@ function BinaryApp() {
             Privacy Policy
           </a>
         </div>
-      </div>  {/* This closes max-w-2xl mx-auto */}
-    </div>  {/* This closes min-h-screen */}
+      </div>
+    </div>
   );
 }
-// Render App
-ReactDOM.render(<BinaryApp />, document.getElementById('root'));
+// Render App (react 18)
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<BinaryApp />);
 </script>
 </body>
 </html>
