@@ -586,6 +586,8 @@ function BinaryApp() {
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+    const [touchStart, setTouchStart] = useState(null);
+const [touchEnd, setTouchEnd] = useState(null);
   const [message, setMessage] = useState(null);
 
   const showMessage = (txt, type = 'success') => {
@@ -915,7 +917,20 @@ function BinaryApp() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+<div 
+  className="max-w-2xl mx-auto px-4 py-6"
+  onTouchStart={(e) => setTouchStart(e.changedTouches[0].clientX)}
+  onTouchMove={(e) => setTouchEnd(e.changedTouches[0].clientX)}
+  onTouchEnd={() => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 80;
+    const isRightSwipe = distance < -80;
+
+    if (isLeftSwipe && view === 'my') setView('public');
+    if (isRightSwipe && view === 'public') setView('my');
+  }}
+>
         {message && (
           <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-medium ${message.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
             {message.txt}
