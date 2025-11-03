@@ -410,12 +410,15 @@ function UserProfile({ targetUid, onBack, currentUser }) {
   const [profileItems, setProfileItems] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [profileComments, setProfileComments] = useState({});
+    // MAIN: Load profile data (user + public items)
   useEffect(() => {
     let unsubItems;
     (async () => {
       const userDoc = await db.collection('users').doc(targetUid).get();
       if (!userDoc.exists) { setLoading(false); return; }
       setProfileUser({ id: userDoc.id, ...userDoc.data() });
+        // Listen for public items
       unsubItems = db.collection('items')
         .where('userId', '==', targetUid)
         .where('isPublic', '==', true)
@@ -428,6 +431,35 @@ function UserProfile({ targetUid, onBack, currentUser }) {
     })();
     return () => unsubItems && unsubItems();
   }, [targetUid]);
+    // NEW: Load comments for profile items (separate effect, triggered by profileItems change)
+    useEffect(() => {
+    if (profileItems.length > 0) {
+      loadProfileComments(profileItems);  // Use local version below
+    }
+  }, [profileItems]);
+    // NEW: Local loadComments function (duplicated/adapted from main app for independence)
+  const loadProfileComments = async (itemList) => {
+    const itemIds = itemList.map(i => i.id);
+    if (!itemIds.length) return;
+    
+    const batches = [];
+    for (let i = 0; i < itemIds.length; i += 30) {
+      const batch = itemIds.slice(i, i + 30);
+      const snap = await db.collection(COMMENTS_COLLECTION)
+        .where('itemId', 'in', batch)
+        .orderBy('createdAt', 'asc')
+        .get();
+      
+      const map = {};
+      snap.docs.forEach(d => {
+        const c = { id: d.id, ...d.data() };
+        const arr = map[c.itemId] || [];
+        arr.push(c);
+        map[c.itemId] = arr;
+      });
+      setProfileComments(prev => ({ ...prev, ...map }));
+    }
+  };
   const filtered = useMemo(() => {
     if (selectedCategory === 'All') return profileItems;
     return profileItems.filter(i => i.category === selectedCategory);
