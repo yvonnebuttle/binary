@@ -680,11 +680,13 @@ const [comments, setComments] = useState({});           // { itemId: [{…}] }
 const loadComments = async (itemList) => {
   const itemIds = itemList.map(i => i.id);
   if (!itemIds.length) return;
-  const snap = await db.collection(COMMENTS_COLLECTION)
-    .where('itemId', 'in', itemIds)
-    .orderBy('createdAt', 'asc')
-    .get();
-  const map = {};
+const batches = [];
+  for (let i = 0; i < itemIds.length; i += 30) {
+    const batch = itemIds.slice(i, i + 30);
+    const snap = await db.collection(COMMENTS_COLLECTION)
+      .where('itemId', 'in', batch)
+      .orderBy('createdAt', 'asc')
+      .get();
   snap.docs.forEach(d => {
     const c = { id: d.id, ...d.data() };
     const arr = map[c.itemId] || [];
