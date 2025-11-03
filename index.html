@@ -1018,6 +1018,8 @@ useEffect(() => {
       query = query.startAfter(startAfterDoc); // Next page magic!
     }
     const snap = await query.get();
+    lastSnap = snap; // Keep track of last snapshot
+      
     if (snap.empty && startAfterDoc) {
       setHasMore(false); // No more!
       break;
