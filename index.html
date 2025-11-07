@@ -936,26 +936,6 @@ setIsLoading(false);
 });
 return () => unsub();
 }, []);
-// Handle redirect result ONCE after auth is ready
-useEffect(() => {
-const checkRedirect = async () => {
-try {
-const result = await auth.getRedirectResult();
-if (result && result.user) {
-console.log('Redirect result found:', result.user.uid);
-await saveUserToFirestore(result.user);
-showMessage('Signed in successfully!');
-}
-} catch (error) {
-// Ignore "no redirect result" error (expected on normal page loads)
-if (error.code !== 'auth/no-redirect-result') {
-console.error('Redirect error:', error);
-showMessage('Sign-in error. Please try again.', 'error');
-}
-}
-};
-checkRedirect();
-}, []);
 // Public feed reload with reset
 useEffect(() => {
 if (view === 'public' && user) {
