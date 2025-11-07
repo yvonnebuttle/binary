@@ -1003,26 +1003,30 @@ const lastItemEl = document.querySelector('.space-y-3 > *:last-child');
 if (lastItemEl) observer.observe(lastItemEl);
 return () => observer.disconnect();
 }, [publicItems, lastDoc, hasMore, loadingMore, view]); 
-// Get user location once on mount
+// 1. Location effect
 useEffect(() => {
-if (navigator.geolocation) {
-navigator.geolocation.getCurrentPosition(
-(pos) => {
-setUserLat(pos.coords.latitude);
-setUserLng(pos.coords.longitude);
-},
-(err) => console.warn('Location unavailable:', err),
-{ maximumAge: 300000 } // Cache for 5 mins
-);
-// Auto-load demo if ?demo=uid&category=books
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setUserLat(pos.coords.latitude);
+        setUserLng(pos.coords.longitude);
+      },
+      err => console.warn('Location unavailable:', err),
+      { maximumAge: 300000 }
+    );
+  }
+}, []);
+
+// 2. Demo mode effect
 useEffect(() => {
   if (demoUid && !user) {
     loadDemoProfile(demoUid, demoCategory);
     setView('public');
     setSelectedCategory(demoCategory);
   }
-}, [demoUid, demoCategory]);
-// Cancel demo load if user logs in or leaves
+}, [demoUid, demoCategory, user]);
+
+// 3. Cancel demo when user logs in
 useEffect(() => {
   if (user && isDemoMode) {
     window.demoAbortController?.abort();
