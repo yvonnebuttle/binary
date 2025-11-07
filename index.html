@@ -990,7 +990,7 @@ useEffect(() => {
 }, [searchQuery, following, user]);
 // Infinite scroll observer
 useEffect(() => {
-if (view !== 'public' || !hasMore || publicItems.length === 0 || loadingMore) return;
+if (view !== 'public' || !hasMore || publicItems.length === 0 || loadingMore || isDemoMode || !user) return;
 const observer = new IntersectionObserver(
 ([entry]) => {
 if (entry.isIntersecting) {
@@ -1002,7 +1002,7 @@ loadPublicFeed(lastDoc);
 const lastItemEl = document.querySelector('.space-y-3 > *:last-child');
 if (lastItemEl) observer.observe(lastItemEl);
 return () => observer.disconnect();
-}, [publicItems, lastDoc, hasMore, loadingMore, view]); 
+}, [publicItems, lastDoc, hasMore, loadingMore, view, user, isDemoMode]); 
 // 1️⃣  Get location once
 useEffect(() => {
   if (navigator.geolocation) {
@@ -1123,7 +1123,7 @@ const loadDemoProfile = async (uid, category) => {
     }));
     
     setPublicItems(items);
-    await loadComments(items);
+    //await loadComments(items);// not enabled if not logged in
   } catch (err) {
     if (err.name === 'AbortError') return;
     console.error('Demo load error:', err);
