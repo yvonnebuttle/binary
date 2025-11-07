@@ -1003,7 +1003,7 @@ const lastItemEl = document.querySelector('.space-y-3 > *:last-child');
 if (lastItemEl) observer.observe(lastItemEl);
 return () => observer.disconnect();
 }, [publicItems, lastDoc, hasMore, loadingMore, view]); 
-// 1. Location effect
+// 1️⃣  Get location once
 useEffect(() => {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -1017,7 +1017,7 @@ useEffect(() => {
   }
 }, []);
 
-// 2. Demo mode effect
+// 2️⃣  Auto-load demo if ?demo=uid&category=books
 useEffect(() => {
   if (demoUid && !user) {
     loadDemoProfile(demoUid, demoCategory);
@@ -1026,14 +1026,13 @@ useEffect(() => {
   }
 }, [demoUid, demoCategory, user]);
 
-// 3. Cancel demo when user logs in
+// 3️⃣  Cancel demo when user logs in
 useEffect(() => {
   if (user && isDemoMode) {
     window.demoAbortController?.abort();
     setIsDemoMode(false);
   }
-}, [user, isDemoMode]);
-}, []);
+}, [user, isDemoMode]);  // ✅ end here — nothing after this
 //public feed
 const loadPublicFeed = async (startAfterDoc = null) => {
 if (loadingMore && startAfterDoc) return; // Don't double-load
