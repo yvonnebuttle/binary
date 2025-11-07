@@ -970,6 +970,14 @@ setPublicItems([]); // Clear for fresh load
 loadPublicFeed();
 }
 }, [view, following, user]);
+// Search users automatically when typing
+useEffect(() => {
+  const timeout = setTimeout(() => {
+    searchUsers(searchQuery);
+  }, 300); // 300ms debounce
+
+  return () => clearTimeout(timeout);
+}, [searchQuery, following, user]);
 // Infinite scroll observer
 useEffect(() => {
 if (view !== 'public' || !hasMore || publicItems.length === 0 || loadingMore) return;
