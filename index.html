@@ -908,15 +908,6 @@ const signInWithGoogle = async () => {
           }
         };
         window.addEventListener('message', handler);
-
-        // Fallback: if popup closed without message
-        const checkClosed = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', handler);
-            reject(new Error('Popup closed'));
-          }
-        }, 500);
       });
     }
 
