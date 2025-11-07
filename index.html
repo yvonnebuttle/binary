@@ -1085,20 +1085,40 @@ setFollowing(snap.docs.map(d => d.data().followingId));
 };
 // Load demo profile (public items for non-auth user)
 const loadDemoProfile = async (uid, category) => {
-  const userDoc = await db.collection('users').doc(uid).get();
-  if (!userDoc.exists) return;
-  setDemoUser({ id: uid, ...userDoc.data() });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-  const snap = await db.collection('items')
-    .where('userId', '==', uid)
-    .where('isPublic', '==', true)
-    .where('category', '==', category)
-    .orderBy('timestamp', 'desc')
-    .get();
-  
-  const items = snap.docs.map(d => ({ id: d.id, ...d.data(), userName: userDoc.data().displayName }));
-  setPublicItems(items); // Reuse publicItems state for display
-  await loadComments(items);
+  try {
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists || controller.signal.aborted) return;
+    setDemoUser({ id: uid, ...userDoc.data() });
+
+    const snap = await db.collection('items')
+      .where('userId', '==', uid)
+      .where('isPublic', '==', true)
+      .where('category', '==', category)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    if (controller.signal.aborted) return;
+
+    const items = snap.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data(), 
+      userName: userDoc.data().displayName 
+    }));
+    
+    setPublicItems(items);
+    await loadComments(items);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error('Demo load error:', err);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  // Store controller to cancel later
+  window.demoAbortController = controller;
 };
 const searchUsers = async q => {
   if (!q.trim()) {
