@@ -1039,6 +1039,7 @@ if (loadingMore && startAfterDoc) return; // Don't double-load
 if (!user) {
       setLoadingMore(false); // Ensure loading spinner is turned off
       return;
+}
 setLoadingMore(true);
 const uids = [user.uid, ...following]; // Your users (self + follows)
 if (!uids.length) {
