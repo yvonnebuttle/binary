@@ -876,13 +876,26 @@ photoURL: user.photoURL,
 lastLogin: firebase.firestore.FieldValue.serverTimestamp()
 }, { merge: true });
 };
-// IMPROVED SIGN-IN FUNCTION
+// ---------------------------------------------------------------
+//  Base-64 padding fix – put this right after the other helpers
+// ---------------------------------------------------------------
+function fixBase64(str) {
+  if (!str) return str;
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  switch (str.length % 4) {
+    case 2: str += '=='; break;
+    case 3: str += '=';  break;
+  }
+  return str;
+}
+//  NEW signInWithGoogle – replace the old one (starts ~ line 380)
+// ------------------------------------------------------------------
 const signInWithGoogle = async () => {
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // iOS PWA: Use Worker popup
+    // ---------- iOS PWA (standalone) – use custom popup ----------
     if (isIOS && isInStandaloneMode()) {
       const popup = window.open(
         `${AUTH_WORKER_URL}/auth/google`,
@@ -896,21 +909,33 @@ const signInWithGoogle = async () => {
           if (e.data.type !== 'FIREBASE_AUTH') return;
 
           window.removeEventListener('message', handler);
+
           try {
-            const cred = firebase.auth.GoogleAuthProvider.credential(null, e.data.token);
-            const result = await auth.signInWithCredential(cred);
+            // ---- 1. Fix Base64 padding (defensive) ----
+            const rawToken = e.data.token;
+            const token = fixBase64(rawToken);
+
+            // ---- 2. Log for debugging (remove in prod if you want) ----
+            console.log('Raw token:', rawToken);
+            console.log('Fixed token length:', token.length);
+
+            // ---- 3. Create credential with **only** the ID token ----
+            const credential = firebase.auth.GoogleAuthProvider.credential(token);
+
+            const result = await auth.signInWithCredential(credential);
             await saveUserToFirestore(result.user);
             showMessage('Signed in!');
             resolve(result);
           } catch (err) {
-            showMessage('Login failed', 'error');
+            console.error('Auth failed:', err);
+            showMessage('Login failed: ' + err.message, 'error');
             reject(err);
           }
         };
         window.addEventListener('message', handler);
       });
     }
-
+    
     // iOS Safari / Android / Desktop
     const result = await auth.signInWithPopup(provider);
     await saveUserToFirestore(result.user);
