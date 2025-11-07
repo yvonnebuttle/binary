@@ -878,52 +878,58 @@ lastLogin: firebase.firestore.FieldValue.serverTimestamp()
 };
 // IMPROVED SIGN-IN FUNCTION
 const signInWithGoogle = async () => {
-try {
-const provider = new firebase.auth.GoogleAuthProvider();
-provider.setCustomParameters({ 
-prompt: 'select_account',
-// Force fresh authentication
-auth_type: 'reauthenticate'
-});
-console.log('Device info:', { isIOS, isAndroid, isMobile, isPWA: isInStandaloneMode() });
-// iOS PWA: Always use popup (most reliable)
-if (isIOS && isInStandaloneMode()) {
-console.log('iOS PWA → using popup');
-try {
-const result = await auth.signInWithPopup(provider);
-await saveUserToFirestore(result.user);
-showMessage('Welcome!');
-} catch (popupError) {
-console.error('Popup failed:', popupError);
-// Fallback to redirect if popup fails
-if (popupError.code === 'auth/popup-blocked') {
-showMessage('Popup blocked, trying redirect...', 'error');
-await auth.signInWithRedirect(provider);
-}
-}
-return;
-}
-// iOS Safari (not PWA): Use redirect (popup often fails)
-if (isIOS && !isInStandaloneMode()) {
-console.log('iOS Safari → using redirect');
-await auth.signInWithRedirect(provider);
-return;
-}
-// Android: Always use redirect
-if (isAndroid) {
-console.log('Android → using redirect');
-await auth.signInWithRedirect(provider);
-return;
-}
-// Desktop: Use popup
-console.log('Desktop → using popup');
-const result = await auth.signInWithPopup(provider);
-await saveUserToFirestore(result.user);
-showMessage('Welcome!');
-} catch (error) {
-console.error('Sign-in error:', error);
-showMessage('Sign-in failed. Try again?', 'error');
-}
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    // iOS PWA: Use Worker popup
+    if (isIOS && isInStandaloneMode()) {
+      const popup = window.open(
+        `${AUTH_WORKER_URL}/auth/google`,
+        'googleAuth',
+        'width=500,height=600,left=100,top=100'
+      );
+
+      return new Promise((resolve, reject) => {
+        const handler = async (e) => {
+          if (e.origin !== AUTH_WORKER_URL) return;
+          if (e.data.type !== 'FIREBASE_AUTH') return;
+
+          window.removeEventListener('message', handler);
+          try {
+            const cred = firebase.auth.GoogleAuthProvider.credential(null, e.data.token);
+            const result = await auth.signInWithCredential(cred);
+            await saveUserToFirestore(result.user);
+            showMessage('Signed in!');
+            resolve(result);
+          } catch (err) {
+            showMessage('Login failed', 'error');
+            reject(err);
+          }
+        };
+        window.addEventListener('message', handler);
+
+        // Fallback: if popup closed without message
+        const checkClosed = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkClosed);
+            window.removeEventListener('message', handler);
+            reject(new Error('Popup closed'));
+          }
+        }, 500);
+      });
+    }
+
+    // iOS Safari / Android / Desktop
+    const result = await auth.signInWithPopup(provider);
+    await saveUserToFirestore(result.user);
+    showMessage('Signed in!');
+    return result;
+
+  } catch (error) {
+    console.error('Sign-in error:', error);
+    showMessage('Sign-in failed', 'error');
+  }
 };
 // Auth observer with redirect handling
 useEffect(() => {
