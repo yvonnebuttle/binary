@@ -959,7 +959,12 @@ console.log('Auth state changed:', u?.uid || 'logged out');
 setUser(u);
 
 if (u) {
-await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
+  // Cancel any demo loading
+  window.demoAbortController?.abort();
+  setIsDemoMode(false);
+  setPublicItems([]);
+  setDemoUser(null);
+  await Promise.all([loadMyItems(u.uid), loadFollowing(u.uid)]);
 }
 
 setIsLoading(false);
@@ -1017,6 +1022,13 @@ useEffect(() => {
     setSelectedCategory(demoCategory);
   }
 }, [demoUid, demoCategory]);
+// Cancel demo load if user logs in or leaves
+useEffect(() => {
+  if (user && isDemoMode) {
+    window.demoAbortController?.abort();
+    setIsDemoMode(false);
+  }
+}, [user, isDemoMode]);
 }
 }, []);
 //public feed
