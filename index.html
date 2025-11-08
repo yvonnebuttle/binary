@@ -409,8 +409,30 @@ return 'Other';
 function UserProfile({ targetUid, onBack, currentUser }) {
 const [profileUser, setProfileUser] = useState(null);
 const [profileItems, setProfileItems] = useState([]);
+const [comments, setComments] = useState({});
 const [selectedCategory, setSelectedCategory] = useState('All');
 const [loading, setLoading] = useState(true);
+// NEW: Load comments function
+  const loadComments = async (itemList) => {
+    const itemIds = itemList.map(i => i.id);
+    if (!itemIds.length) return;
+    const batches = [];
+    for (let i = 0; i < itemIds.length; i += 30) {
+      const batch = itemIds.slice(i, i + 30);
+      const snap = await db.collection(COMMENTS_COLLECTION)
+        .where('itemId', 'in', batch)
+        .orderBy('createdAt', 'asc')
+        .get();
+      const map = {};
+      snap.docs.forEach(d => {
+        const c = { id: d.id, ...d.data() };
+        const arr = map[c.itemId] || [];
+        arr.push(c);
+        map[c.itemId] = arr;
+      });
+      setComments(prev => ({ ...prev, ...map }));
+    }
+  };
 useEffect(() => {
 let unsubItems;
 (async () => {
@@ -421,7 +443,7 @@ unsubItems = db.collection('items')
 .where('userId', '==', targetUid)
 .where('isPublic', '==', true)
 .orderBy('timestamp', 'desc')
-.onSnapshot(snap => {
+.onSnapshot(async (snap) => {
 const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 setProfileItems(items);
 setLoading(false);
@@ -471,7 +493,19 @@ className={`px-4 py-2 rounded-lg font-medium ${selectedCategory === cat ? 'bg-pu
 </p>
 </div>
 ) : (
-filtered.map(item => <ItemCard key={item.id} item={item} view="public" currentUser={currentUser} onVisitProfile={() => {}} />)
+filtered.map(item => (
+              <ItemCard 
+                key={item.id} 
+                item={item} 
+                view="public" 
+                currentUser={currentUser} 
+                onVisitProfile={() => {}} 
+                comments={comments}  // NEW: Pass comments
+                setComments={setComments}  // NEW: Pass setComments
+                userLat={userLat}  // UPDATED: Pass for distance (optional but consistent)
+                userLng={userLng}  // UPDATED: Pass for distance (optional but consistent)
+                />
+  ))
 )}
 </div>
 </div>
@@ -1327,7 +1361,7 @@ if (!user && !isDemoMode) {
 }
 if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
 if (view === 'profile' && profileTarget) {
-return <UserProfile targetUid={profileTarget} onBack={backFromProfile} currentUser={user} />;
+  return <UserProfile targetUid={profileTarget} onBack={backFromProfile} currentUser={user} userLat={userLat} userLng={userLng} />;
 }
 return (
 <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
