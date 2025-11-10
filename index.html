@@ -406,7 +406,7 @@ console.log('❌ No match, defaulting to Other');
 return 'Other';
 }
 // === UserProfile Component ===
-function UserProfile({ targetUid, onBack, currentUser }) {
+function UserProfile({ targetUid, onBack, currentUser, userLat, userLng }) {
 const [profileUser, setProfileUser] = useState(null);
 const [profileItems, setProfileItems] = useState([]);
 const [comments, setComments] = useState({});
