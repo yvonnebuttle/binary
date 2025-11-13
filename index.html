@@ -1098,62 +1098,77 @@ useEffect(() => {
 }, [user, isDemoMode]);  // ✅ end here — nothing after this
 //public feed
 const loadPublicFeed = async (startAfterDoc = null) => {
-if (loadingMore && startAfterDoc) return; // Don't double-load
-if (!user) {
-      setLoadingMore(false); // Ensure loading spinner is turned off
-      return;
-}
-setLoadingMore(true);
-const uids = [user.uid, ...following]; // Your users (self + follows)
-if (!uids.length) {
-setPublicItems([]);
-setLoadingMore(false);
-setHasMore(false);
-return;
-}
-let allNewItems = []; // Collect items from batches
-for (let i = 0; i < uids.length; i += 10) { // Batch UIDs (Firestore limit)
-const batch = uids.slice(i, i + 10);
-let query = db.collection('items')
-.where('userId', 'in', batch)
-.where('isPublic', '==', true)
-.orderBy('timestamp', 'desc')
-.limit(20); // 20 per batch
-if (startAfterDoc) {
-query = query.startAfter(startAfterDoc); // Next page magic!
-}
-const snap = await query.get();
-if (snap.empty && startAfterDoc) {
-setHasMore(false); // No more!
-break;
-}
-const items = await Promise.all(
-snap.docs.map(async doc => {
-const data = doc.data();
-const uDoc = await db.collection('users').doc(data.userId).get();
-const u = uDoc.data() || {};
-return {
-id: doc.id,
-...data,
-userName: u.displayName || 'Anonymous',
-isOwnItem: data.userId === user.uid
-};
-})
-);
-allNewItems.push(...items);
-}
-// Sort newest first
-allNewItems.sort((a, b) => b.timestamp - a.timestamp);
-// Add to state: Replace if first load, append if more
-setPublicItems(prev => startAfterDoc ? [...prev, ...allNewItems] : allNewItems);
-// Update bookmark & comments
-if (allNewItems.length > 0 && snap?.docs?.length > 0) {  // Safe check for snap
-setLastDoc(snap.docs[snap.docs.length - 1]); // Last item as next start
-} else {
-setHasMore(false);
-}
-await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems); // Load comments for new ones
-setLoadingMore(false);
+    if (loadingMore && startAfterDoc) return;
+    if (!user) {
+        setLoadingMore(false);
+        return;
+    }
+    setLoadingMore(true);
+    const uids = [user.uid, ...following];
+    if (!uids.length) {
+        setPublicItems([]);
+        setLoadingMore(false);
+        setHasMore(false);
+        return;
+    }
+    
+    let allNewItems = [];
+    let snap; // 1. Declare snap outside the loop
+
+    for (let i = 0; i < uids.length; i += 10) {
+        const batch = uids.slice(i, i + 10);
+        let query = db.collection('items')
+            .where('userId', 'in', batch)
+            .where('isPublic', '==', true)
+            .orderBy('timestamp', 'desc')
+            .limit(20);
+            
+        if (startAfterDoc) {
+            query = query.startAfter(startAfterDoc);
+        }
+
+        snap = await query.get(); // 2. Assign to the outer snap variable
+
+        if (snap.empty && startAfterDoc) {
+            setHasMore(false);
+            break;
+        }
+
+        const items = await Promise.all(
+            snap.docs.map(async doc => {
+                const data = doc.data();
+                const uDoc = await db.collection('users').doc(data.userId).get();
+                const u = uDoc.data() || {};
+                return {
+                    id: doc.id,
+                    ...data,
+                    userName: u.displayName || 'Anonymous',
+                    isOwnItem: data.userId === user.uid
+                };
+            })
+        );
+        allNewItems.push(...items);
+    }
+
+    // Sort newest first
+    allNewItems.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Add to state: Replace if first load, append if more
+    setPublicItems(prev => startAfterDoc ? [...prev, ...allNewItems] : allNewItems);
+
+    // 3. NOW THIS CODE WORKS, because 'snap' still exists
+    if (allNewItems.length > 0 && snap?.docs?.length > 0) {
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        // If we received fewer items than we asked for, there are probably no more.
+        if (snap.docs.length < 20) {
+            setHasMore(false);
+        }
+    } else {
+        setHasMore(false);
+    }
+
+    await loadComments(startAfterDoc ? [...publicItems, ...allNewItems] : allNewItems);
+    setLoadingMore(false);
 };
 const loadMyItems = async uid => {
 const snap = await db.collection('items').where('userId', '==', uid).orderBy('timestamp', 'desc').get();
