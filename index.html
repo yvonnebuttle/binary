@@ -1543,7 +1543,7 @@ className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white fo
 </div>
 )}
 {/* Filter */}
-{currentItems.length > 0 && (
+{((view === 'my' && items.length > 0) || view === 'public') && (
 <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
 <div className="flex items-center gap-2 mb-3">
 <Filter />
@@ -1551,8 +1551,11 @@ className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white fo
 </div>
 <div className="flex flex-wrap gap-2">
 {['All', ...ALL_CATEGORIES].map(c => (
-<button key={c} onClick={() => setSelectedCategory(c)} className={`px-4 py-2 rounded-lg font-medium ${selectedCategory === c ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-{c}
+<button
+    key={c}
+    onClick={() => setSelectedCategory(c)}
+    className={`px-4 py-2 rounded-lg font-medium ${selectedCategory === c ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+    {c}
 </button>
 ))}
 </div>
