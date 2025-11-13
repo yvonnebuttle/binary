@@ -475,6 +475,7 @@ unsubItems = db.collection('items')
 .onSnapshot(async (snap) => {
 const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 setProfileItems(items);
+await loadComments(items);
 setLoading(false);
 });
 })();
