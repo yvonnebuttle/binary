@@ -1040,9 +1040,9 @@ if (view === 'public' && user) {
 setHasMore(true);
 setLastDoc(null);
 setPublicItems([]); // Clear for fresh load
-loadPublicFeed();
-}
-}, [view, following, user]);
+loadPublicFeed(null, selectedCategory);
+    }
+}, [view, following, user, selectedCategory]);
 // Search users automatically when typing
 useEffect(() => {
   const timeout = setTimeout(() => {
@@ -1057,7 +1057,7 @@ if (view !== 'public' || !hasMore || publicItems.length === 0 || loadingMore || 
 const observer = new IntersectionObserver(
 ([entry]) => {
 if (entry.isIntersecting) {
-loadPublicFeed(lastDoc);
+loadPublicFeed(lastDoc, selectedCategory);
 }
 },
 { threshold: 0.1 }
@@ -1065,7 +1065,7 @@ loadPublicFeed(lastDoc);
 const lastItemEl = document.querySelector('.space-y-3 > *:last-child');
 if (lastItemEl) observer.observe(lastItemEl);
 return () => observer.disconnect();
-}, [publicItems, lastDoc, hasMore, loadingMore, view, user, isDemoMode]); 
+}, [publicItems, lastDoc, hasMore, loadingMore, view, user, isDemoMode, selectedCategory]); 
 // 1️⃣  Get location once
 useEffect(() => {
   if (navigator.geolocation) {
@@ -1097,7 +1097,7 @@ useEffect(() => {
   }
 }, [user, isDemoMode]);  // ✅ end here — nothing after this
 //public feed
-const loadPublicFeed = async (startAfterDoc = null) => {
+const loadPublicFeed = async (startAfterDoc = null, category = 'All') => {
     if (loadingMore && startAfterDoc) return;
     if (!user) {
         setLoadingMore(false);
@@ -1122,6 +1122,9 @@ const loadPublicFeed = async (startAfterDoc = null) => {
             .where('isPublic', '==', true)
             .orderBy('timestamp', 'desc')
             .limit(20);
+      
+       if (category !== 'All') {
+            query = query.where('category', '==', category);
             
         if (startAfterDoc) {
             query = query.startAfter(startAfterDoc);
