@@ -1123,9 +1123,10 @@ const loadPublicFeed = async (startAfterDoc = null, category = 'All') => {
             .orderBy('timestamp', 'desc')
             .limit(20);
       
-       if (category !== 'All') {
+        // 1. Conditionally add the category filter
+        if (category !== 'All') {
             query = query.where('category', '==', category);
-            
+        }    
         if (startAfterDoc) {
             query = query.startAfter(startAfterDoc);
         }
