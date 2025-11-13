@@ -293,114 +293,143 @@ const dLon = (lon2 - lon1) * Math.PI / 180;
 const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
 return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-// ===  DETECT CATEGORY FUNCTION WITH CACHING ===
+// === HELPER: Is this a place-related category? ===
+function isPlaceCategory(cat) {
+  return ['Food', 'Coffee', 'Pints', 'Places'].includes(cat);
+}
+
+// === HELPER: Strict geotagging with name + type + distance match ===
+async function tryGeotag(text, userLat, userLng, expectedCategory) {
+  if (!window.google?.maps) return null;
+
+  try {
+    await waitForGoogleMaps();
+    const service = new google.maps.places.PlacesService(document.createElement('div'));
+
+    const request = {
+      query: text,
+      location: new google.maps.LatLng(userLat, userLng),
+      radius: 500, // 0.5km max
+    };
+
+    const results = await new Promise(resolve => {
+      service.textSearch(request, (res, status) => {
+        resolve(status === google.maps.places.PlacesServiceStatus.OK ? res || [] : []);
+      });
+    });
+
+    if (results.length === 0) return null;
+
+    // Sort by distance
+    results.sort((a, b) => {
+      const distA = distanceKm(userLat, userLng, a.geometry.location.lat(), a.geometry.location.lng());
+      const distB = distanceKm(userLat, userLng, b.geometry.location.lat(), b.geometry.location.lng());
+      return distA - distB;
+    });
+
+    const closest = results[0];
+    const dist = distanceKm(userLat, userLng, closest.geometry.location.lat(), closest.geometry.location.lng());
+
+    // 1. Distance < 3 km
+    if (dist > 3) return null;
+
+    // 2. Name overlap (at least one word from input)
+    const placeName = closest.name.toLowerCase();
+    const inputWords = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const hasNameOverlap = inputWords.some(word => placeName.includes(word));
+    if (!hasNameOverlap) return null;
+
+    // 3. Type must match expected category
+    const typeMap = {
+      Food: ['restaurant', 'food', 'meal_takeaway', 'bakery', 'cafe'],
+      Coffee: ['cafe', 'coffee_shop'],
+      Pints: ['bar', 'pub', 'night_club', 'brewery'],
+      Places: ['tourist_attraction', 'park', 'museum', 'landmark', 'point_of_interest']
+    };
+
+    const expectedTypes = typeMap[expectedCategory] || [];
+    const hasValidType = closest.types?.some(t => expectedTypes.includes(t));
+    if (!hasValidType) return null;
+
+    console.log(`Geotag success: "${closest.name}" (${dist.toFixed(2)}km)`);
+    return {
+      category: expectedCategory,
+      lat: closest.geometry.location.lat(),
+      lng: closest.geometry.location.lng()
+    };
+  } catch (e) {
+    console.warn('Geotag failed:', e);
+    return null;
+  }
+  function keywordFallback(text) {
+  const lower = text.toLowerCase();
+  const inputWords = lower.split(/\s+/).map(w => w.replace(/s$/, '')).filter(w => w.length > 2);
+  const scores = {};
+
+  ALL_CATEGORIES.forEach(c => scores[c] = 0);
+
+  for (const word of inputWords) {
+    for (const [cat, keywords] of Object.entries(FULL_CATEGORIES)) {
+      if (keywords?.includes(word)) {
+        scores[cat] += 1;
+      }
+    }
+  }
+
+  let best = 'Other';
+  let maxScore = 0;
+  for (const [cat, score] of Object.entries(scores)) {
+    if (score > maxScore) {
+      maxScore = score;
+      best = cat;
+    }
+  }
+
+  console.log('Keyword fallback:', best, `(score: ${maxScore})`);
+  return maxScore > 0 ? best : 'Other';
+}
+}// ===  DETECT CATEGORY FUNCTION WITH CACHING ===
 async function detectCategory(inputText, userLat, userLng) {
-const text = inputText.trim();
-if (!text) return 'Other';
+  const text = inputText.trim();
+  if (!text) return 'Other';
 
-const lower = text.toLowerCase();
-const normalized = normalizeForCache(text);
-// ---- 1. CHECK CACHE FIRST (highest priority) ----
-if (categoryCache[normalized]) {
-console.log('✅ Cache hit:', normalized, '→', categoryCache[normalized]);
-return categoryCache[normalized];
-}
-// ---- 2. PROXIMITY CHECK (Google Maps) ----
-if (window.google?.maps && userLat && userLng) {
-try {
-await waitForGoogleMaps();
-const service = new google.maps.places.PlacesService(document.createElement('div'));
-const request = {
-query: text,
-location: new google.maps.LatLng(userLat, userLng),
-radius: 2000
-};
-const results = await new Promise(resolve => {
-service.textSearch(request, (res, status) => {
-resolve(status === google.maps.places.PlacesServiceStatus.OK ? res || [] : []);
-});
-});
+  const normalized = normalizeForCache(text);
 
-if (results.length > 0) {
-results.sort((a, b) => {
-const distA = distanceKm(userLat, userLng, a.geometry.location.lat(), a.geometry.location.lng());
-const distB = distanceKm(userLat, userLng, b.geometry.location.lat(), b.geometry.location.lng());
-return distA - distB;
-});
-const closest = results[0];
-const dist = distanceKm(userLat, userLng, closest.geometry.location.lat(), closest.geometry.location.lng());
-if (dist <= 2) {
-const types = closest.types || [];
-const lat = closest.geometry.location.lat();
-const lng = closest.geometry.location.lng();
+  // 1. CHECK CACHE FIRST
+  if (categoryCache[normalized]) {
+    console.log('Cache hit:', normalized, '→', categoryCache[normalized]);
+    const cached = categoryCache[normalized];
 
-if (types.includes('restaurant') || types.includes('food') || types.includes('meal_takeaway') || types.includes('bakery')) {
-console.log('✅ Google Maps: Food');
-categoryCache[normalized] = 'Food';
-saveCache();
-return { category: 'Food', lat, lng };
-}
-if (types.includes('coffee_shop') || types.includes('cafe')) {
-console.log('✅ Google Maps: Coffee');
-categoryCache[normalized] = 'Coffee';
-saveCache();
-return { category: 'Coffee', lat, lng };
-}
-if (types.includes('bar') || types.includes('pub') || types.includes('night_club')) {
-console.log('✅ Google Maps: Pints');
-categoryCache[normalized] = 'Pints';
-saveCache();
-return { category: 'Pints', lat, lng };
-}
-if (types.some(t => ['museum', 'park', 'tourist_attraction'].includes(t))) {
-console.log('✅ Google Maps: Places');
-categoryCache[normalized] = 'Places';
-saveCache();
-return { category: 'Places', lat, lng };
-}
-}
-}
-} catch (e) {
-console.warn('Proximity error:', e);
-}
-}
-// ---- 3. OPENAI CLASSIFICATION ----
-console.log('🤖 Calling OpenAI for:', text);
-const aiCategory = await classifyWithOpenAI(text);
-if (aiCategory) {
-console.log('✅ OpenAI:', aiCategory);
-categoryCache[normalized] = aiCategory;
-saveCache();
-return aiCategory;
-}
-// ---- 4. KEYWORD FALLBACK ----
-const inputWords = lower.split(/\s+/)
-.map(w => w.replace(/s$/, ''))
-.filter(w => w.length > 2);
-const scores = {};
-ALL_CATEGORIES.forEach(c => scores[c] = 0);
-for (const word of inputWords) {
-for (const [cat, keywords] of Object.entries(FULL_CATEGORIES)) {
-if (!keywords) continue;
-if (keywords.includes(word)) {
-scores[cat] += 1;
-}
-}
-}
-let best = 'Other';
-let maxScore = 0;
-for (const [cat, score] of Object.entries(scores)) {
-if (score > maxScore) {
-maxScore = score;
-best = cat;
-}
-}
-if (maxScore > 0) {
-console.log('✅ Keywords:', best);
-categoryCache[normalized] = best;
-saveCache();
-return best;
-}
+    // If cached as place-related, try to re-validate geotag
+    if (isPlaceCategory(cached) && userLat && userLng) {
+      const geo = await tryGeotag(text, userLat, userLng, cached);
+      return geo ? { ...geo, category: cached } : cached;
+    }
+    return cached;
+  }
+
+  // 2. OPENAI CLASSIFICATION
+  console.log('Calling OpenAI for:', text);
+  const aiCategory = await classifyWithOpenAI(text);
+
+  let resultCategory = aiCategory || keywordFallback(text);
+
+  // 3. GEOTAG ONLY IF PLACE-RELATED + LOCATION AVAILABLE
+  let finalResult = resultCategory;
+  if (isPlaceCategory(resultCategory) && userLat && userLng) {
+    const geo = await tryGeotag(text, userLat, userLng, resultCategory);
+    if (geo) {
+      finalResult = geo;
+      console.log('Geotag attached:', geo);
+    }
+  }
+
+  // 4. CACHE FINAL RESULT
+  const cacheValue = typeof finalResult === 'object' ? finalResult.category : finalResult;
+  categoryCache[normalized] = cacheValue;
+  saveCache();
+
+  return finalResult;
 // ---- 5. DEFAULT ----
 console.log('❌ No match, defaulting to Other');
 return 'Other';
