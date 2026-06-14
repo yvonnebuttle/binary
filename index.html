@@ -61,6 +61,7 @@ const UserPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height
 const UserMinus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" x2="16" y1="11" y2="11"/></svg>;
 const X = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const Sparkle = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.94 14.06 2 22M22 2l-7.94 7.94M14.06 9.94 22 2M2 22l7.94-7.94"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>;
+const RefreshCw = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>;
 
 // === Master category list ===
 const ALL_CATEGORIES = [
@@ -146,7 +147,8 @@ const FULL_CATEGORIES = {
     'kebab', 'souvlaki', 'moussaka', 'spanakopita',
     'pelmeni', 'vareniki', 'goulash', 'sauerkraut', 'kimchi', 'japchae', 'bulgogi', 'galbi',
     'hotpot', 'shabu', 'sukiyaki', 'okonomiyaki', 'takoyaki', 'gyoza', 'baozi',
-    'congee', 'steakhouse', 'fastfood', 'finedining', 'kitchen'
+    'congee', 'steakhouse', 'fastfood', 'finedining', 'kitchen',
+    'roast', 'lasagne', 'lasagna', 'casserole', 'dumplings', 'wrap', 'toastie', 'chowder'
   ],
   'Cheese': ['cheese', 'cheddar', 'mozzarella', 'parmesan', 'brie', 'feta', 'gouda', 'swiss',
     'provolone', 'ricotta', 'camembert', 'gruyere', 'manchego', 'gorgonzola', 'roquefort', 'stilton', 'halloumi', 'burrata',
@@ -258,10 +260,37 @@ function isPlaceCategory(cat) {
   return ['Food', 'Coffee', 'Pints', 'Places'].includes(cat);
 }
 
+// Words that are NOT venue names: generic preference/filler words plus every
+// food/drink/place keyword. A real venue reference ("Dublin Pizza Company",
+// "Grogans") contains tokens outside this set; a generic preference
+// ("I like pizza", "sushi") does not — so we can refuse to geotag the latter.
+const GEO_GENERIC_WORDS = new Set(
+  ['like','love','loved','hate','hated','really','great','greatest','best','nice','good','bad',
+   'amazing','lovely','tasty','delicious','favourite','favorite','this','that','had','have',
+   'went','got','tried','tasted','grabbed','ordered','some','today','yesterday','tonight',
+   'morning','evening','lunch','dinner','breakfast','brunch','place','spot','here','there']
+   .concat(['Food','Coffee','Pints','Wine','Cheese','Places']
+     .flatMap(c => FULL_CATEGORIES[c] || []))
+);
+
+// Singularize a word WITHOUT mangling words that genuinely end in "ss"
+// ("guinness" -> "guinness", but "pints" -> "pint", "burgers" -> "burger").
+function singularize(w) {
+  if (w.endsWith('ss')) return w;          // guinness, glass, address
+  if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y'; // berries -> berry
+  if (w.endsWith('s') && !w.endsWith('us')) return w.slice(0, -1);    // pints -> pint
+  return w;
+}
+
 // === KEYWORD FALLBACK (MOVED TO MODULE SCOPE — was previously trapped inside tryGeotag, causing crashes) ===
 function keywordFallback(text) {
   const lower = text.toLowerCase();
-  const inputWords = lower.split(/\s+/).map(w => w.replace(/s$/, '')).filter(w => w.length > 2);
+  // Check BOTH the original word and a singularized form so "Guinness",
+  // "chips", "IPAs" etc. still match instead of being mangled.
+  const inputWords = lower.split(/\s+/)
+    .map(w => w.replace(/[^\w]/g, ''))
+    .filter(w => w.length > 2)
+    .flatMap(w => [w, singularize(w)]);
   const scores = {};
 
   ALL_CATEGORIES.forEach(c => scores[c] = 0);
@@ -320,9 +349,17 @@ async function tryGeotag(text, userLat, userLng, expectedCategory) {
 
     if (dist > 3) return null;
 
-    const placeName = closest.name.toLowerCase();
-    const inputWords = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-    const hasNameOverlap = inputWords.some(word => placeName.includes(word));
+    const placeName = closest.name.toLowerCase().replace(/[^\w\s]/g, '');
+    const inputWords = text.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    // Only consider words that could plausibly be part of a venue name —
+    // i.e. NOT generic food/drink/preference words. "I like pizza" has none,
+    // so we never falsely pin it to a nearby pizzeria.
+    const distinctive = inputWords.filter(w => !GEO_GENERIC_WORDS.has(w) && !GEO_GENERIC_WORDS.has(singularize(w)));
+    if (distinctive.length === 0) {
+      console.log('📍 Skipped geotag: no venue name in', JSON.stringify(text));
+      return null;
+    }
+    const hasNameOverlap = distinctive.some(word => placeName.includes(word));
     if (!hasNameOverlap) return null;
 
     const typeMap = {
@@ -359,18 +396,16 @@ async function detectCategory(inputText, userLat, userLng, effectiveCategories) 
   // 1. CHECK CACHE FIRST
   if (categoryCache[normalized]) {
     const cached = categoryCache[normalized];
-    console.log('💾 Cache hit:', normalized, '→', cached);
-
-    // Cache may have stored geo as object: {category, lat, lng}
-    if (typeof cached === 'object' && cached !== null && cached.lat) {
-      return cached;
+    // Older cache entries may be objects {category,lat,lng}. We now trust ONLY
+    // the category and always resolve location fresh from the current position,
+    // so the same phrase logged in a different place isn't given a stale pin.
+    const cachedCat = (typeof cached === 'object' && cached !== null) ? cached.category : cached;
+    console.log('💾 Cache hit:', normalized, '→', cachedCat);
+    if (isPlaceCategory(cachedCat) && userLat && userLng) {
+      const geo = await tryGeotag(text, userLat, userLng, cachedCat);
+      return geo ? geo : cachedCat;
     }
-    // Plain string. If place-related, try fresh geotag.
-    if (isPlaceCategory(cached) && userLat && userLng) {
-      const geo = await tryGeotag(text, userLat, userLng, cached);
-      return geo ? geo : cached;
-    }
-    return cached;
+    return cachedCat;
   }
 
   // 2. OPENAI CLASSIFICATION
@@ -396,16 +431,36 @@ async function detectCategory(inputText, userLat, userLng, effectiveCategories) 
     if (geo) finalResult = geo;
   }
 
-  // 5. CACHE FINAL RESULT (including geo if present)
-  categoryCache[normalized] = finalResult;
+  // 5. CACHE ONLY THE CATEGORY — never coordinates. Location is resolved fresh
+  //    on every entry so a cached phrase can't carry an old place's pin.
+  categoryCache[normalized] = (typeof finalResult === 'object' && finalResult !== null)
+    ? finalResult.category
+    : finalResult;
   saveCache();
 
   return finalResult;
 }
 
+// === Voice transcript parser ===
+// "I love Dublin Pizza Company" -> { rating: 'like',    text: 'Dublin Pizza Company' }
+// "I don't like the new Tesco"  -> { rating: 'dislike', text: 'the new Tesco' }
+function parseVoice(transcript) {
+  const raw = transcript.trim().replace(/[.!?]+$/, '');
+  // Order matters: test dislike first ("don't like" contains "like").
+  const DISLIKE = /^\s*(i\s+)?(really\s+|absolutely\s+|so\s+)?(do not like|don'?t like|did not like|didn'?t like|dislike[d]?|hate[d]?|am not a fan of|'?m not a fan of|can'?t stand|didn'?t enjoy|do not enjoy|don'?t enjoy|wasn'?t keen on|am not keen on)\s+/i;
+  const LIKE = /^\s*(i\s+)?(really\s+|absolutely\s+|so\s+)?(like[d]?|love[d]?|enjoy[ed]*|am a fan of|'?m a fan of|rate|recommend|am into)\s+/i;
+
+  let m = raw.match(DISLIKE);
+  if (m) return { rating: 'dislike', text: raw.slice(m[0].length).trim() };
+  m = raw.match(LIKE);
+  if (m) return { rating: 'like', text: raw.slice(m[0].length).trim() };
+  // No explicit sentiment — default to like, keep the whole phrase.
+  return { rating: 'like', text: raw };
+}
+
 // === Filter helper used everywhere for the text-search feature ===
 function matchesTextFilter(item, query) {
-  if (!query || query.length < 3) return true;
+  if (!query || query.trim().length < 2) return true;
   const q = query.toLowerCase();
   const text = (item.text || '').toLowerCase();
   const comment = (item.comment || '').toLowerCase();
@@ -413,7 +468,7 @@ function matchesTextFilter(item, query) {
 }
 
 // === Search bar component (reused on multiple pages) ===
-function SearchBar({ value, onChange, placeholder = 'Search your posts (3+ letters)...' }) {
+function SearchBar({ value, onChange, placeholder = 'Search your posts (2+ letters)...' }) {
   return (
     <div className="relative mb-3">
       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -578,7 +633,7 @@ function UserProfile({ targetUid, onBack, currentUser, userLat, userLng, effecti
             <SearchBar
               value={textFilter}
               onChange={setTextFilter}
-              placeholder={`Search ${profileUser.displayName}'s posts (3+ letters)...`}
+              placeholder={`Search ${profileUser.displayName}'s posts (2+ letters)...`}
             />
             <div className="flex items-center gap-2 mb-3">
               <Filter />
@@ -601,7 +656,7 @@ function UserProfile({ targetUid, onBack, currentUser, userLat, userLng, effecti
               <p className="text-gray-500">
                 {profileItems.length === 0
                   ? 'No public ratings yet.'
-                  : textFilter && textFilter.length >= 3
+                  : textFilter && textFilter.trim().length >= 2
                     ? `No posts matching "${textFilter}".`
                     : 'No items in this category.'}
               </p>
@@ -976,6 +1031,15 @@ function BinaryApp() {
   const [touchEnd, setTouchEnd] = useState(null);
   const minSwipeDistance = 80;
 
+  // Pull-to-refresh
+  const [pullStartY, setPullStartY] = useState(null);
+  const [pullDelta, setPullDelta] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const PULL_THRESHOLD = 70;
+
+  // Undo toast for instant adds (used by the Apple Shortcut deep-link too)
+  const [undoToast, setUndoToast] = useState(null); // { id, text, rating, category }
+
   const [message, setMessage] = useState(null);
   const [comments, setComments] = useState({});
 
@@ -1009,24 +1073,84 @@ function BinaryApp() {
   const onTouchStart = (e) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
+    // Only arm pull-to-refresh if we're at the very top of the page.
+    setPullStartY(window.scrollY <= 0 ? e.targetTouches[0].clientY : null);
+    setPullDelta(0);
   };
   const onTouchMove = (e) => {
     setTouchEnd(e.targetTouches[0].clientX);
+    if (pullStartY !== null && window.scrollY <= 0) {
+      const dy = e.targetTouches[0].clientY - pullStartY;
+      // Only react to downward pulls; cap with resistance for a natural feel.
+      setPullDelta(dy > 0 ? Math.min(dy * 0.5, 90) : 0);
+    }
   };
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-    if (isLeftSwipe && view === 'my') setView('public');
-    if (isRightSwipe && view === 'public') setView('my');
+    // Pull-to-refresh wins if it was a clear vertical pull from the top.
+    if (pullDelta >= PULL_THRESHOLD) {
+      refresh();
+    } else if (touchStart !== null && touchEnd !== null) {
+      const distance = touchStart - touchEnd;
+      // Ignore horizontal swipe if the gesture was mostly vertical.
+      if (Math.abs(distance) > minSwipeDistance && pullDelta < 20) {
+        if (distance > 0 && view === 'my') setView('public');
+        if (distance < 0 && view === 'public') setView('my');
+      }
+    }
     setTouchStart(null);
     setTouchEnd(null);
+    setPullStartY(null);
+    setPullDelta(0);
+  };
+
+  // === Pull-to-refresh: reload the current view's items ===
+  const refresh = async () => {
+    if (refreshing || !user) return;
+    setRefreshing(true);
+    try {
+      if (view === 'public') {
+        setHasMore(true);
+        setLastDoc(null);
+        setPublicItems([]);
+        await loadPublicFeed(null, selectedCategory);
+      } else {
+        await loadMyItems(user.uid);
+      }
+      showMessage('Refreshed');
+    } catch (e) {
+      console.error('Refresh failed:', e);
+      showMessage('Refresh failed', 'error');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const showMessage = (txt, type = 'success') => {
     setMessage({ txt, type });
     setTimeout(() => setMessage(null), 3000);
+  };
+
+  // === Undo toast for instant/voice adds ===
+  const showUndo = (id, text, rating, category) => {
+    if (!id) { showMessage('Added!'); return; }
+    setUndoToast({ id, text, rating, category });
+    setTimeout(() => {
+      setUndoToast(prev => (prev && prev.id === id ? null : prev));
+    }, 6000);
+  };
+
+  const undoAdd = async () => {
+    if (!undoToast) return;
+    const { id } = undoToast;
+    setUndoToast(null);
+    try {
+      await db.collection('items').doc(id).delete();
+      setItems(prev => prev.filter(i => i.id !== id));
+      showMessage('Removed');
+    } catch (e) {
+      console.error('Undo failed:', e);
+      showMessage('Undo failed', 'error');
+    }
   };
 
   const loadComments = async (itemList) => {
@@ -1253,6 +1377,47 @@ function BinaryApp() {
     setTextFilter('');
   }, [view]);
 
+  // === Apple Shortcut / deep-link entry ===
+  // A Shortcut dictates text and opens e.g.
+  //   https://binaryapp.app/?add=I%20like%20Dublin%20Pizza%20Company
+  //   https://binaryapp.app/?add=Dublin%20Pizza%20Company&rating=like
+  // We parse the sentiment, fire the entry instantly, then strip the param so a
+  // refresh can't double-add. We give GPS a brief window so venues still geotag.
+  const deepLinkFiredRef = React.useRef(false);
+  useEffect(() => {
+    if (!user || deepLinkFiredRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const addText = params.get('add');
+    if (!addText || !addText.trim()) return;
+
+    const fire = () => {
+      if (deepLinkFiredRef.current) return;
+      deepLinkFiredRef.current = true;
+      const ratingParam = (params.get('rating') || '').toLowerCase();
+      let rating, text;
+      if (ratingParam === 'like' || ratingParam === 'dislike') {
+        rating = ratingParam;
+        text = addText.trim();
+      } else {
+        ({ rating, text } = parseVoice(addText));
+      }
+      // Strip the query so refresh / re-open doesn't re-add.
+      window.history.replaceState({}, '', window.location.pathname);
+      if (text) {
+        setView('my');
+        addItem(rating, text);
+      }
+    };
+
+    // Fire as soon as location is known; otherwise wait up to 2.5s then fire anyway.
+    if (userLat !== null && userLng !== null) {
+      fire();
+    } else {
+      const t = setTimeout(fire, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [user, userLat, userLng]);
+
   const loadPublicFeed = async (startAfterDoc = null, category = 'All') => {
     if (loadingMore && startAfterDoc) return;
     if (!user) {
@@ -1310,7 +1475,12 @@ function BinaryApp() {
     }
 
     allNewItems.sort((a, b) => b.timestamp - a.timestamp);
-    setPublicItems(prev => startAfterDoc ? [...prev, ...allNewItems] : allNewItems);
+    // Dedupe by id — multi-batch "in" queries (>10 follows) can overlap.
+    setPublicItems(prev => {
+      const merged = startAfterDoc ? [...prev, ...allNewItems] : allNewItems;
+      const seen = new Set();
+      return merged.filter(i => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+    });
 
     if (allNewItems.length > 0 && snap?.docs?.length > 0) {
       setLastDoc(snap.docs[snap.docs.length - 1]);
@@ -1404,10 +1574,11 @@ function BinaryApp() {
   };
 
   // === ADD ITEM — the core flow, now handling NEW: suggestions ===
-  const addItem = async (rating) => {
-    if (!inputText.trim() || isProcessing) return;
+  // `overrideText` lets voice input submit a phrase without touching the box.
+  const addItem = async (rating, overrideText) => {
+    const originalText = (typeof overrideText === 'string' ? overrideText : inputText).trim();
+    if (!originalText || isProcessing) return;
     setIsProcessing(true);
-    const originalText = inputText.trim();
 
     try {
       // NOTE: uses the userLat/userLng already in state — no duplicate fetch.
@@ -1439,8 +1610,9 @@ function BinaryApp() {
         return;
       }
 
-      // Normal save
-      await saveItem(originalText, rating, cat, geoLat, geoLng);
+      // Normal save — show an "undo" toast so an instant/voice entry is reversible
+      const savedId = await saveItem(originalText, rating, cat, geoLat, geoLng);
+      showUndo(savedId, originalText, rating, cat);
     } catch (e) {
       console.error('addItem error:', e);
       showMessage('Error adding item', 'error');
@@ -1450,6 +1622,7 @@ function BinaryApp() {
   };
 
   // === Shared save (used by addItem and the new-category modal callbacks) ===
+  // Returns the new document id. Does NOT show a toast — caller decides.
   const saveItem = async (text, rating, category, geoLat = null, geoLng = null) => {
     const payload = {
       text,
@@ -1469,14 +1642,12 @@ function BinaryApp() {
     setItems(prev => [{ id: ref.id, ...payload }, ...prev]);
     setInputText('');
 
-    // Cache (with geo if present)
+    // Cache the CATEGORY only (location is always resolved fresh from GPS).
     const normalized = normalizeForCache(text);
-    categoryCache[normalized] = (geoLat && geoLng)
-      ? { category, lat: geoLat, lng: geoLng }
-      : category;
+    categoryCache[normalized] = category;
     saveCache();
 
-    showMessage('Added!');
+    return ref.id;
   };
 
   // Modal callbacks
@@ -1484,15 +1655,17 @@ function BinaryApp() {
     if (!newCatModal) return;
     const { originalText, rating, geoLat, geoLng } = newCatModal;
     await saveCustomCategory(finalName);
-    await saveItem(originalText, rating, finalName, geoLat, geoLng);
+    const savedId = await saveItem(originalText, rating, finalName, geoLat, geoLng);
     setNewCatModal(null);
+    showUndo(savedId, originalText, rating, finalName);
   };
 
   const handleNewCatUseOther = async () => {
     if (!newCatModal) return;
     const { originalText, rating, geoLat, geoLng } = newCatModal;
-    await saveItem(originalText, rating, 'Other', geoLat, geoLng);
+    const savedId = await saveItem(originalText, rating, 'Other', geoLat, geoLng);
     setNewCatModal(null);
+    showUndo(savedId, originalText, rating, 'Other');
   };
 
   const handleNewCatCancel = () => {
@@ -1630,15 +1803,47 @@ function BinaryApp() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 pb-6">
+      {/* Pull-to-refresh indicator */}
+      {(pullDelta > 0 || refreshing) && (
+        <div
+          className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center pointer-events-none"
+          style={{ height: refreshing ? 48 : Math.max(pullDelta, 0), opacity: refreshing ? 1 : Math.min(pullDelta / PULL_THRESHOLD, 1) }}
+        >
+          <div className="flex items-center gap-2 text-purple-600 text-sm font-medium">
+            <span className={refreshing ? 'animate-spin' : ''} style={{ transform: refreshing ? 'none' : `rotate(${pullDelta * 3}deg)` }}>
+              <RefreshCw />
+            </span>
+            <span>{refreshing ? 'Refreshing…' : pullDelta >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
+          </div>
+        </div>
+      )}
       <div
         className="max-w-2xl mx-auto px-4 py-6"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        style={{ transform: pullDelta > 0 ? `translateY(${pullDelta}px)` : 'none', transition: pullDelta > 0 ? 'none' : 'transform 0.2s' }}
       >
         {message && (
           <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-medium ${message.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
             {message.txt}
+          </div>
+        )}
+
+        {/* UNDO TOAST (instant/voice adds) */}
+        {undoToast && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl max-w-[90vw]">
+            <span className="text-sm">
+              {undoToast.rating === 'like' ? '👍' : '👎'} Added{' '}
+              <span className="font-semibold">"{undoToast.text.length > 28 ? undoToast.text.slice(0, 28) + '…' : undoToast.text}"</span>
+              <span className="text-gray-400"> · {undoToast.category}</span>
+            </span>
+            <button
+              onClick={undoAdd}
+              className="text-purple-300 hover:text-purple-100 font-semibold text-sm underline shrink-0"
+            >
+              Undo
+            </button>
           </div>
         )}
 
@@ -1780,7 +1985,7 @@ function BinaryApp() {
             <SearchBar
               value={textFilter}
               onChange={setTextFilter}
-              placeholder={view === 'my' ? 'Search your posts (3+ letters)...' : 'Search the feed (3+ letters)...'}
+              placeholder={view === 'my' ? 'Search your posts (2+ letters)...' : 'Search the feed (2+ letters)...'}
             />
             <div className="flex items-center gap-2 mb-3">
               <Filter />
@@ -1804,7 +2009,7 @@ function BinaryApp() {
           {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
               <p className="text-gray-500">
-                {textFilter && textFilter.length >= 3
+                {textFilter && textFilter.trim().length >= 2
                   ? `No posts matching "${textFilter}".`
                   : view === 'public'
                     ? following.length === 0
