@@ -345,29 +345,14 @@ async function tryGeotag(text, userLat, userLng, expectedCategory) {
 
     if (results.length === 0) return null;
 
-    results.sort((a, b) => {
-      const distA = distanceKm(userLat, userLng, a.geometry.location.lat(), a.geometry.location.lng());
-      const distB = distanceKm(userLat, userLng, b.geometry.location.lat(), b.geometry.location.lng());
-      return distA - distB;
-    });
-
-    const closest = results[0];
-    const dist = distanceKm(userLat, userLng, closest.geometry.location.lat(), closest.geometry.location.lng());
-
-    if (dist > 3) return null;
-
-    const placeName = closest.name.toLowerCase().replace(/[^\w\s]/g, '');
+    // Distinctive = words that could be part of a venue NAME (not generic
+    // food/drink/preference words). "I like pizza" has none -> never geotag.
     const inputWords = text.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
-    // Only consider words that could plausibly be part of a venue name —
-    // i.e. NOT generic food/drink/preference words. "I like pizza" has none,
-    // so we never falsely pin it to a nearby pizzeria.
     const distinctive = inputWords.filter(w => !GEO_GENERIC_WORDS.has(w) && !GEO_GENERIC_WORDS.has(singularize(w)));
     if (distinctive.length === 0) {
       console.log('📍 Skipped geotag: no venue name in', JSON.stringify(text));
       return null;
     }
-    const hasNameOverlap = distinctive.some(word => placeName.includes(word));
-    if (!hasNameOverlap) return null;
 
     const typeMap = {
       Food: ['restaurant', 'food', 'meal_takeaway', 'bakery', 'cafe'],
@@ -375,16 +360,30 @@ async function tryGeotag(text, userLat, userLng, expectedCategory) {
       Pints: ['bar', 'pub', 'night_club', 'brewery'],
       Places: ['tourist_attraction', 'park', 'museum', 'landmark']
     };
-
     const expectedTypes = typeMap[expectedCategory] || [];
-    const hasValidType = closest.types?.some(t => expectedTypes.includes(t));
-    if (!hasValidType) return null;
 
-    console.log(`📍 Geotag success: "${closest.name}" (${dist.toFixed(2)}km)`);
+    // Find the CLOSEST result whose name actually contains a distinctive word
+    // and whose type matches the category — not just the nearest result of any
+    // name (which broke "vice pizza" when a closer pizzeria existed).
+    let best = null, bestDist = Infinity;
+    for (const r of results) {
+      const loc = r.geometry?.location;
+      if (!loc) continue;
+      const d = distanceKm(userLat, userLng, loc.lat(), loc.lng());
+      if (d > 3) continue;
+      const name = (r.name || '').toLowerCase().replace(/[^\w\s]/g, '');
+      if (!distinctive.some(w => name.includes(w))) continue;
+      const typeOk = expectedTypes.length === 0 || r.types?.some(t => expectedTypes.includes(t));
+      if (!typeOk) continue;
+      if (d < bestDist) { best = r; bestDist = d; }
+    }
+    if (!best) return null;
+
+    console.log(`📍 Geotag success: "${best.name}" (${bestDist.toFixed(2)}km)`);
     return {
       category: expectedCategory,
-      lat: closest.geometry.location.lat(),
-      lng: closest.geometry.location.lng()
+      lat: best.geometry.location.lat(),
+      lng: best.geometry.location.lng()
     };
   } catch (e) {
     console.warn('Geotag failed:', e);
