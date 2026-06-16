@@ -1208,6 +1208,12 @@ function BinaryApp() {
       photoURL: user.photoURL,
       lastLogin: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    // Public profile (name + photo only) — safe for anonymous/demo reads.
+    // `users` itself is restricted to authenticated reads to keep email private.
+    await db.collection('profiles').doc(user.uid).set({
+      displayName: user.displayName,
+      photoURL: user.photoURL
+    }, { merge: true });
   };
 
   function fixBase64(str) {
@@ -1524,7 +1530,9 @@ function BinaryApp() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     try {
-      const userDoc = await db.collection('users').doc(uid).get();
+      // Demo mode runs logged-out, so read the world-readable public profile
+      // (name + photo) rather than the auth-restricted `users` doc.
+      const userDoc = await db.collection('profiles').doc(uid).get();
       if (!userDoc.exists || controller.signal.aborted) return;
       setDemoUser({ id: uid, ...userDoc.data() });
       const snap = await db.collection('items')
